@@ -3,139 +3,151 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
 <style>
-/* Layout: 한 장의 픽셀 사무실(지도)을 위에, 아래에 캐릭터 카드·관계도·생활 일지를 두는 관찰 화면 */
+/* Layout: 게임 화면처럼 사무실(층 하나 = 한 화면)을 크게, 위·아래에 반투명 조작줄을 겹치고, 아래에 탭형 정보 카드 */
 :root {
-  --bg: #f3efe6;          /* 종이빛 배경 */
-  --panel: #fffaf0;
-  --ink: #2f2a24;
-  --ink-soft: #6b6157;
-  --line: #e1d6c3;
-  --accent: #d9776b;      /* 하트·연인 */
-  --leaf: #5f8f5a;        /* 실제 기록(시험) 표시 */
-  --sky: #6f9fc9;
-  --chip-bg: #f6e9d6;
+  --bg: #f3efe6; --panel: #fffaf0; --ink: #2f2a24; --ink-soft: #6b6157; --line: #e1d6c3;
+  --accent: #d9776b; --leaf: #5f8f5a; --chip-bg: #f6e9d6;
+  --hud: rgba(47,42,36,.72); --hud-ink: #fff9ee;
   --font-display: "Jua", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   --font-body: "Gowun Dodum", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #1f1c1a; --panel: #29251f; --ink: #f1e9dc; --ink-soft: #b7ab9b; --line: #3e372e;
-  --accent: #ef8f82; --leaf: #8cc184; --sky: #8db6dc; --chip-bg: #3a3128; color-scheme: dark } }
+  --accent: #ef8f82; --leaf: #8cc184; --chip-bg: #3a3128; --hud: rgba(20,18,16,.78); --hud-ink: #fff9ee; color-scheme: dark } }
 :root[data-theme="dark"] { --bg: #1f1c1a; --panel: #29251f; --ink: #f1e9dc; --ink-soft: #b7ab9b; --line: #3e372e;
-  --accent: #ef8f82; --leaf: #8cc184; --sky: #8db6dc; --chip-bg: #3a3128; color-scheme: dark }
+  --accent: #ef8f82; --leaf: #8cc184; --chip-bg: #3a3128; --hud: rgba(20,18,16,.78); --hud-ink: #fff9ee; color-scheme: dark }
 * { box-sizing: border-box }
+[hidden] { display: none !important }
 body { background: var(--bg); color: var(--ink); font-family: var(--font-body); margin: 0;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px 32px }
-.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 14px }
-header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end; justify-content: space-between }
-h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(22px, 3.4vw, 32px); margin: 0; letter-spacing: .01em }
-.sub { color: var(--ink-soft); font-size: 14px; margin-top: 2px }
-.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
-.clock { font-family: var(--font-display); font-size: 19px; font-variant-numeric: tabular-nums }
-button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
-  border-radius: 999px; padding: 6px 12px; cursor: pointer }
-button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 28px }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 10px }
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 10px }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(20px, 3.2vw, 30px); margin: 0 }
+.sub { grid-column: 1 / -1; color: var(--ink-soft); font-size: 14px; margin: 0 }
+button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 6px 12px; cursor: pointer }
+button[aria-pressed="true"], button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
-.legend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--ink-soft) }
+.icon { width: 36px; height: 36px; padding: 0; font-size: 18px }
+.legend { display: flex; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--ink-soft) }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--chip-bg) }
-.dot { width: 9px; height: 9px; border-radius: 50% }
-.stage { position: relative; width: 100%; border-radius: 10px; overflow: hidden; border: 3px solid #3b3128; background: #2a241e; touch-action: manipulation }
-.stage canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; cursor: pointer }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none }
+.stage { position: relative; width: 100%; border-radius: 12px; overflow: hidden; border: 3px solid #3b3128; background: #2a241e; touch-action: none }
+.stage canvas#cv { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; cursor: grab }
 .overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden }
-#mini { position: absolute; right: 8px; top: 8px; width: min(26%, 230px); height: auto; border: 2px solid #3b3128; border-radius: 6px; background: #2a241e; opacity: .92; cursor: pointer; image-rendering: pixelated }
-@media (max-width: 600px) { #mini { display: none } }
-.rooms { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
-@media (max-width: 600px) {
-  .rooms { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none }
-  .rooms button, .controls button, .people button { min-height: 38px; flex: 0 0 auto }
-  .controls { width: 100% } .clock { min-width: 0; width: 100% }
-  .legend { font-size: 12px } .log { max-height: 260px } .stage { border-width: 2px; border-radius: 8px }
-  .bubble { max-width: 62% }
-}
-.hint { font-size: 12.5px; color: var(--ink-soft) }
-.rooms button { font-size: 13px; padding: 4px 10px }
-.follow { font-family: var(--font-display); font-size: 15px; margin-right: 6px }
-.bubble { position: absolute; transform: translate(-50%, -100%); max-width: min(230px, 46%); background: #fffdf7; color: #2f2a24;
-  border: 2px solid #3b3128; border-radius: 10px; padding: 5px 10px; font-size: 15px; line-height: 1.35; font-family: var(--font-body);
-  box-shadow: 0 2px 0 #3b312833; white-space: normal; word-break: keep-all }
+.hud { position: absolute; left: 0; right: 0; display: flex; gap: 6px; align-items: center; justify-content: space-between; padding: 6px; pointer-events: none; flex-wrap: wrap }
+.hud > * { pointer-events: auto }
+.hud-top { top: 0 } .hud-bottom { bottom: 0 }
+.hud button { background: var(--hud); color: var(--hud-ink); border-color: transparent; font-size: 13px; padding: 5px 10px; min-height: 32px; backdrop-filter: blur(2px) }
+.hud button[aria-pressed="true"] { background: #fff4d6; color: #2f2a24 }
+.floors, .clockbox, .people, .zoom { display: flex; gap: 5px; align-items: center; flex-wrap: wrap }
+.clock { background: var(--hud); color: var(--hud-ink); border-radius: 999px; padding: 6px 11px; font-family: var(--font-display); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap }
+.people button .dot { display: inline-block; margin-right: 5px; vertical-align: 1px }
+#mini { position: absolute; right: 8px; top: 48px; width: min(30%, 260px); height: auto; border: 2px solid #3b3128; border-radius: 6px; background: #2a241e; opacity: .92; cursor: pointer; image-rendering: pixelated }
+.bubble { position: absolute; transform: translate(-50%, -100%); max-width: min(240px, 46%); background: #fffdf7; color: #2f2a24; border: 2px solid #3b3128;
+  border-radius: 10px; padding: 5px 10px; font-size: 15px; line-height: 1.35; font-family: var(--font-body); box-shadow: 0 2px 0 #3b312833; word-break: keep-all }
 .bubble::after { content: ""; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #3b3128 }
-.bubble.real { border-color: #4f7d49; background: #f1fbef }
-.bubble.real::after { border-top-color: #4f7d49 }
-.bubble .tag { display: block; font-size: 10.5px; color: #4f7d49; font-weight: 700; letter-spacing: .02em }
-.name { position: absolute; transform: translate(-50%, 4px); font-family: var(--font-display); font-size: 15px; color: #fff;
-  text-shadow: 0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000; white-space: nowrap }
+.bubble.real { border-color: #4f7d49; background: #f1fbef } .bubble.real::after { border-top-color: #4f7d49 }
+.bubble .tag { display: block; font-size: 10.5px; color: #4f7d49; font-weight: 700 }
+.bubble.mini { padding: 1px 6px; font-size: 13px; border-radius: 8px }
+.name { position: absolute; transform: translate(-50%, 4px); font-family: var(--font-display); font-size: 15px; color: #fff; white-space: nowrap;
+  text-shadow: 0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000 }
 .name.sel { color: #ffe08a }
-.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 14px }
-@media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr) } .bubble { font-size: 12.5px; padding: 3px 7px } .name { font-size: 12px } }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0 }
-.panel h2 { font-family: var(--font-display); font-weight: 400; font-size: 18px; margin: 0 0 8px }
-.people { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px }
-.card dl { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: 4px 10px; margin: 0; font-size: 14px }
-.card dt { color: var(--ink-soft) }
-.card dd { margin: 0 }
-.bar { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 5px }
-.bar > i { display: block; height: 100% }
+.ticker { min-height: 1.6em; font-size: 14.5px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
+.ticker b { font-family: var(--font-display); font-weight: 400; margin-right: 6px }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center }
+.follow { font-family: var(--font-display); font-size: 15px; margin-right: 4px }
+.tabs { display: none; gap: 6px }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1.2fr); gap: 10px }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0 }
+.panel h2 { font-family: var(--font-display); font-weight: 400; font-size: 17px; margin: 0 0 8px }
+.card dl { display: grid; grid-template-columns: 4.6em minmax(0, 1fr); gap: 4px 10px; margin: 0; font-size: 14px }
+.card dt { color: var(--ink-soft) } .card dd { margin: 0 }
+.bar { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 5px } .bar > i { display: block; height: 100% }
 .needs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; font-size: 12px; color: var(--ink-soft) }
-.rel { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px }
-.rel td { padding: 4px 0; border-top: 1px dashed var(--line) }
-.rel td:last-child { text-align: right; font-variant-numeric: tabular-nums }
-.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 360px; overflow: auto; font-size: 13.5px }
-.log li { display: grid; grid-template-columns: 3.4em 3.8em minmax(0, 1fr); gap: 6px; padding: 3px 0; border-bottom: 1px dotted var(--line) }
+.rel { width: 100%; border-collapse: collapse; font-size: 13.5px }
+.rel td { padding: 5px 0; border-top: 1px dashed var(--line) } .rel td:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap }
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 320px; overflow: auto; font-size: 13.5px }
+.log li { display: grid; grid-template-columns: 3.2em 3.8em minmax(0, 1fr); gap: 6px; padding: 3px 0; border-bottom: 1px dotted var(--line) }
 .log time { color: var(--ink-soft); font-variant-numeric: tabular-nums }
 .log .k { font-size: 11px; border-radius: 6px; text-align: center; padding: 1px 0; align-self: start; background: var(--chip-bg); color: var(--ink-soft) }
-.log .k.real { background: #dfeedd; color: #3d6a37 }
-.log .k.love { background: #f7dfdb; color: #9c4a40 }
-.foot { font-size: 12.5px; color: var(--ink-soft); line-height: 1.6 }
-.foot a { color: inherit }
+.log .k.real { background: #dfeedd; color: #3d6a37 } .log .k.love { background: #f7dfdb; color: #9c4a40 }
+.foot { font-size: 12.5px; color: var(--ink-soft); line-height: 1.6; margin: 0 } .foot a { color: inherit }
+/* 휴대폰: 게임 화면처럼 사무실을 크게, 정보는 탭 하나씩 */
+@media (max-width: 640px) {
+  body { padding-block: 8px 20px }
+  .sub { display: none }
+  #mini { display: none }
+  .tabs { display: flex }
+  .grid { grid-template-columns: minmax(0, 1fr) }
+  .grid > .panel { display: none } .grid > .panel.on { display: block }
+  .panel h2 { display: none }
+  .log { max-height: 42vh }
+  .hud { padding: 5px; gap: 4px; flex-wrap: nowrap }
+  .hud button { font-size: 12px; padding: 3px 9px; min-height: 30px }
+  .hud-top .floors, .hud-top .clockbox, .hud-bottom .people { flex-wrap: nowrap }
+  .hud-bottom .people { overflow-x: auto; scrollbar-width: none; padding-right: 2px }
+  .people button .dot { display: none }
+  #pause { display: none }
+  .zoom { position: absolute; right: 6px; bottom: 46px; flex-direction: column }
+  .clock { font-size: 12px; padding: 5px 8px }
+  .bubble { font-size: 12.5px; padding: 3px 7px; max-width: 64% }
+  .name { font-size: 12px }
+  .actions button, .tabs button { min-height: 38px }
+}
+/* 휴대폰 가로: 사무실을 화면 높이에 맞추고 정보는 옆 */
+@media (max-height: 520px) and (orientation: landscape) {
+  .wrap { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: start }
+  .top, .legend, .foot { grid-column: 1 / -1 } .sub { display: none }
+  .stage { grid-column: 1; grid-row: span 4 }
+  .ticker, .actions, .tabs, .grid { grid-column: 2 }
+  .tabs { display: flex } .grid { grid-template-columns: minmax(0, 1fr) } .grid > .panel { display: none } .grid > .panel.on { display: block } .panel h2 { display: none }
+  #mini { display: none } .log { max-height: 50vh }
+}
 @media (prefers-reduced-motion: reduce) { .bubble { transition: none } }
 </style>
 
 <div class="wrap">
-  <header>
-    <div>
-      <h1>디지털 연구소 생활관</h1>
-      <div class="sub">지피·미나·솔·클로·코디가 사는 연구소. 일이 없을 때도 각자 생활합니다.</div>
-    </div>
-    <div class="controls" role="group" aria-label="시간 조절">
-      <span class="clock" id="clock" aria-live="off">--:--</span>
-      <button id="sp1" aria-pressed="true">실시간</button>
-      <button id="sp30" aria-pressed="false">30배</button>
-      <button id="sp240" aria-pressed="false">240배</button>
-      <button id="pause" aria-pressed="false">멈춤</button>
-      <button id="replay">실제 기록 재생 · T24-1</button>
-      <button id="ot" aria-pressed="false">야근 장면 보기</button>
-    </div>
+  <header class="top">
+    <h1>디지털 연구소 생활관</h1>
+    <button id="info" class="icon" aria-expanded="true" aria-controls="legend" aria-label="화면 설명 보기">ⓘ</button>
+    <p class="sub">지피·미나·솔·클로·코디가 사는 2층 연구소. 1층에서 연구하고, 2층에서 생활합니다.</p>
   </header>
-  <div class="legend">
+  <div class="legend" id="legend">
     <span class="chip"><span class="dot" style="background:#e9c46a"></span>생활 장면은 연출입니다(가상의 성인 연구원 설정)</span>
     <span class="chip"><span class="dot" style="background:var(--leaf)"></span>초록 테두리 말풍선 = 실제 기록(현재는 시험 기록)</span>
     <span class="chip"><span class="dot" style="background:var(--accent)"></span>관계는 이 브라우저에서만 쌓입니다</span>
-  </div>
-  <div class="rooms" role="group" aria-label="방 바로가기">
-    <span class="follow" id="follow">따라가는 중: 미나</span><span class="hint">· 화면을 끌면 둘러볼 수 있어요</span>
-    <button data-room="1">자료실</button><button data-room="2">회의실</button><button data-room="3">카페 라운지</button>
-    <button data-room="4">연구실</button><button data-room="5">옥상 정원</button><button data-room="6">숙소</button>
+    <span class="chip"><span class="dot" style="background:#8fb8d8"></span>화면을 끌면 둘러보고, 이름을 누르면 따라갑니다</span>
   </div>
   <div class="stage" id="stage">
-    <canvas id="cv" width="1056" height="624" aria-label="연구소 사무실 픽셀 화면. 캐릭터를 누르면 정보가 보이고 화면이 그 캐릭터를 따라갑니다."></canvas>
+    <canvas id="cv" width="1248" height="816" aria-label="연구소 픽셀 화면. 캐릭터를 누르면 정보가 보이고 화면이 따라갑니다."></canvas>
     <div class="overlay" id="ov"></div>
-    <canvas id="mini" width="288" height="180" aria-label="전체 지도. 누르면 그곳으로 이동합니다."></canvas>
+    <div class="hud hud-top">
+      <div class="floors" role="group" aria-label="층 보기"><button id="f1" data-floor="1">1층 연구</button><button id="f2" data-floor="2">2층 생활</button></div>
+      <div class="clockbox"><span class="clock" id="clock">--:--</span><button id="speed">실시간</button><button id="pause" aria-pressed="false">멈춤</button></div>
+    </div>
+    <div class="hud hud-bottom">
+      <div class="people" id="people" role="group" aria-label="연구원 따라가기"></div>
+      <div class="zoom"><button id="zin" aria-label="확대">＋</button><button id="zout" aria-label="축소">－</button></div>
+    </div>
+    <canvas id="mini" width="324" height="102" aria-label="두 층 전체 지도. 누르면 그곳으로 이동합니다."></canvas>
+  </div>
+  <div class="ticker" id="ticker" aria-live="off"></div>
+  <div class="actions">
+    <span class="follow" id="follow">따라가는 중: 미나</span>
+    <button id="replay">실제 기록 재생 · T24-1</button>
+    <button id="ot" aria-pressed="false">야근 장면 보기</button>
+  </div>
+  <div class="tabs" role="tablist" aria-label="정보">
+    <button role="tab" data-tab="card" aria-selected="true">연구원</button><button role="tab" data-tab="rel" aria-selected="false">관계</button><button role="tab" data-tab="log" aria-selected="false">일지</button>
   </div>
   <div class="grid">
-    <section class="panel card" aria-labelledby="h-card">
-      <h2 id="h-card">연구원</h2>
-      <div class="people" id="people" role="group" aria-label="연구원 선택"></div>
-      <dl id="card"></dl>
-      <div class="needs" id="needs"></div>
-      <table class="rel" id="rel" aria-label="관계"></table>
-    </section>
-    <section class="panel" aria-labelledby="h-log">
-      <h2 id="h-log">생활 일지</h2>
-      <ul class="log" id="log"></ul>
-    </section>
+    <section class="panel card on" id="tab-card"><h2>연구원</h2><dl id="card"></dl><div class="needs" id="needs"></div></section>
+    <section class="panel" id="tab-rel"><h2>관계</h2><table class="rel" id="rel" aria-label="관계"></table></section>
+    <section class="panel" id="tab-log"><h2>생활 일지</h2><ul class="log" id="log"></ul></section>
   </div>
   <p class="foot">
     생활 장면(대화·산책·커피·연애 등)은 화면 연출이며 실제 연구 활동이나 모델의 감정을 뜻하지 않습니다. 실제 기록 말풍선은 연구소 v2 원장의 시험 지시 T24-1(2026-11-10 23:19~23:21 KST) 기록을 재생한 것입니다.<br>
-    그림: <a href="https://github.com/pixel-agents-hq/pixel-agents" target="_blank" rel="noopener">Pixel Agents</a>(MIT, © 2026 Pablo De Lucca) 에셋 원본 그대로 사용, 캐릭터 원작 <a href="https://jik-a-4.itch.io/metrocity-free-topdown-character-pack" target="_blank" rel="noopener">JIK-A-4 MetroCity</a>(CC0). 침대·정원 꽃·연못·창문은 이 화면에서 그렸습니다.
+    그림: <a href="https://github.com/pixel-agents-hq/pixel-agents" target="_blank" rel="noopener">Pixel Agents</a>(MIT, © 2026 Pablo De Lucca) 에셋 원본 그대로 사용, 캐릭터 원작 <a href="https://jik-a-4.itch.io/metrocity-free-topdown-character-pack" target="_blank" rel="noopener">JIK-A-4 MetroCity</a>(CC0). 침대·계단·정원·작은 소품은 이 화면에서 그렸습니다.
   </p>
 </div>
 
@@ -144,8 +156,8 @@ const ASSETS = /*__ASSETS__*/{};
 (() => {
 'use strict';
 // ---------------------------------------------------------------- 기본 설정
-const T = 16, COLS = 48, ROWS = 30, S = 3;           // 타일 16px, 지도 48×30, 화면 3배(옛 RPG처럼 크게)
-let VW = 22, VH = 13;                                 // 한 화면에 보이는 칸 수(화면 폭에 따라 바뀜)
+const T = 16, COLS = 54, ROWS = 17, S = 3;           // 타일 16px, 두 층(26×17씩), 화면 3배(옛 RPG처럼 크게)
+let VW = 26, VH = 17;                                 // 한 화면에 보이는 칸 수(화면 폭에 따라 바뀜)
 const cam = { x: 0, y: 0, tx: 0, ty: 0 }; let follow = true;
 const cv = document.getElementById('cv'), cx = cv.getContext('2d');
 cx.imageSmoothingEnabled = false;
@@ -192,18 +204,30 @@ function relSave() { try { localStorage.setItem(STORE, JSON.stringify(rel)); } c
 const R = (a, b) => rel[pk(a, b)];
 function relLabel(r) { return r.couple ? '연인' : r.aff >= 85 ? '설렘' : r.aff >= 65 ? '절친' : r.aff >= 40 ? '친구' : '동료'; }
 
-// ---------------------------------------------------------------- 지도
-// 방: 0 벽, 1 자료실, 2 회의실, 3 카페 라운지, 4 연구실, 5 옥상 정원, 6 숙소, 9 바깥(문)
-const ROOMS = { 1: '자료실', 2: '회의실', 3: '카페 라운지', 4: '연구실', 5: '옥상 정원', 6: '숙소' };
+// ---------------------------------------------------------------- 지도: 2층 구조(한 층 = 한 화면)
+// 1층 연구층(왼쪽, 0~25열) · 2층 생활층(오른쪽, 28~53열). 두 층은 계단 칸끼리 이어져 있다(길찾기에서 순간 이동).
+const FW = 26, FH = 17, F2X = 28;
+const FLOOR_NAME = { 1: '1층 연구층', 2: '2층 생활층' };
+const floorOf = x => (x >= F2X * T ? 2 : 1);
+// 구역(벽 없이 러그·칸막이로 나눔): 1 자료실, 2 회의실, 3 카페 라운지, 4 연구실, 5 옥상 정원, 6 숙소, 7 팀장실, 8 식당
+const ROOMS = { 1: '자료실', 2: '회의실', 3: '카페 라운지', 4: '연구실', 5: '옥상 정원', 6: '숙소', 7: '팀장실', 8: '식당' };
 const grid = [];
 for (let r = 0; r < ROWS; r++) { grid.push([]); for (let c = 0; c < COLS; c++) grid[r].push({ room: 0, wall: true, block: true }); }
 function area(c0, r0, c1, r1, room) { for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) grid[r][c] = { room, wall: false, block: false }; }
-area(1, 2, 14, 12, 1); area(16, 2, 30, 12, 2); area(32, 2, 46, 12, 3);
-area(1, 14, 30, 28, 4); area(32, 14, 46, 20, 5); area(32, 22, 46, 28, 6);
+function zone(c0, r0, c1, r1, room) { for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (!grid[r][c].wall) grid[r][c].room = room; }
+// 1층
+area(1, 2, 24, 15, 4); zone(1, 2, 7, 7, 1); zone(8, 2, 13, 6, 3); zone(14, 2, 24, 7, 2); zone(17, 8, 24, 15, 7);
+// 2층
+area(F2X + 1, 2, F2X + 24, 15, 3); zone(F2X + 1, 2, F2X + 10, 7, 6); zone(F2X + 1, 8, F2X + 10, 15, 8); zone(F2X + 18, 2, F2X + 24, 15, 5);
 function door(c, r, room) { grid[r][c] = { room, wall: false, block: false, door: true }; }
-[[7, 13, 1], [8, 13, 1], [22, 13, 2], [23, 13, 2], [38, 13, 3], [39, 13, 3], [15, 6, 1], [15, 7, 1], [31, 6, 2], [31, 7, 2],
- [31, 17, 4], [31, 18, 4], [42, 21, 5], [43, 21, 5], [31, 25, 4], [31, 26, 4], [14, 29, 4], [15, 29, 4]].forEach(d => door(...d));
-const OUTSIDE = { c: 14.5, r: 30.5 };
+door(12, 16, 4); door(13, 16, 4);                 // 1층 정문
+const ENTRANCE = { c: 12, r: 16 };
+const STAIRS = { 1: { c: 3, r: 15, draw: [1, 12] }, 2: { c: F2X + 3, r: 15, draw: [F2X + 1, 12] } }; // 계단 앞 칸(서로 연결)
+const LINKS = new Map([[15 * COLS + 3, [F2X + 3, 15]], [15 * COLS + F2X + 3, [3, 15]]]);
+const WINDOWS = [2, 6, 10, 16, 21, F2X + 12, F2X + 15, F2X + 19, F2X + 22];
+const LABELS = [['자료실', 1.3, 7.7], ['카페', 8.3, 6.7], ['회의실', 14.3, 7.7], ['연구실', 1.3, 15.7], ['팀장실 · 지피', 17.6, 8.75],
+  ['숙소', F2X + 1.3, 7.7], ['식당', F2X + 1.3, 15.7], ['라운지', F2X + 11.3, 15.7], ['옥상 정원', F2X + 18.3, 15.7]];
+const LIGHTS = [[5, 5, 70], [11, 4, 50], [19, 5, 70], [8, 12, 100], [20, 12, 70], [F2X + 5, 5, 70], [F2X + 5, 12, 80], [F2X + 14, 7, 90], [F2X + 21, 8, 60]];
 
 // 가구와 '쓰는 자리'(spot)
 const items = [];   // {k, x, y, w, h, z}
@@ -212,90 +236,115 @@ function put(k, c, r, opt = {}) {
   const im = imgs[k]; if (!im) return;
   const w = im.width, h = im.height, fw = Math.round(w / T), fh = Math.round(h / T);
   const bg = opt.bg ?? 0;
-  items.push({ k, x: c * T, y: r * T + (opt.dy || 0), w, h, z: opt.z ?? (r * T + h), flip: !!opt.flip, frames: opt.frames });
+  items.push({ k, x: c * T + (opt.dx || 0), y: r * T + (opt.dy || 0), w, h, z: opt.z ?? (r * T + h), flip: !!opt.flip });
+  if (opt.free) return;
   for (let rr = r + bg; rr < r + fh; rr++) for (let cc = c; cc < c + fw; cc++) if (grid[rr] && grid[rr][cc]) grid[rr][cc].block = true;
 }
+// 직접 그리는 작은 소품(밀도용, 지나갈 수 있음): kind, 칸 좌표, 그리기 순서
+const props = [];
+function prop(kind, c, r, opt = {}) { props.push({ kind, x: c * T + (opt.dx || 0), y: r * T + (opt.dy || 0), z: opt.z ?? (r * T + 15), col: opt.col }); if (opt.block) grid[r][c].block = true; }
 function spot(id, c, r, face, pose, tags, opt = {}) { spots.push({ id, c, r, face, pose, tags, owner: opt.owner || null, room: grid[r][c].room, busy: null, dy: opt.dy || 0, dx: opt.dx || 0 }); }
 
-const DESKS = [ ['lead', 25, 22], ['research', 3, 17], ['writer', 10, 17], ['reviewer', 17, 17], ['experiment', 6, 23] ];
-// 팀장실: 연구실 오른쪽에 낮은 칸막이(나무+간유리)로 구분, 입구는 왼쪽 칸막이 가운데
-const LEAD_ROOM = { c0: 23, r0: 20, c1: 29, r1: 27, doorRows: [23, 24] };
+const DESKS = [ ['lead', 19, 10], ['research', 4, 9], ['writer', 9, 9], ['reviewer', 4, 12], ['experiment', 9, 12] ];
+const LEAD_ROOM = { c0: 17, r0: 8, c1: 24, r1: 15, doorRows: [11, 12] };
+const DESK_PROPS = { lead: ['books', 'tea'], research: ['notes', 'mug'], writer: ['flower', 'memo'], reviewer: ['files', 'glasses'], experiment: ['robot', 'tools'] };
 const beds = [];
 function buildMap() {
-  // 연구실: 책상 다섯(사람은 책상 뒤에 앉아 화면 쪽을 봄)
+  // ── 1층 연구층 ──
   for (const [owner, c, r] of DESKS) {
-    // v1 방식: 모니터 화면이 이쪽을 보고, 사람은 책상 앞 의자에 앉아 화면을 봄(작업 중이면 화면이 빛남)
+    // 모니터 화면이 이쪽을 보고, 사람은 책상 앞 의자에 앉아 화면을 봄(작업 중이면 화면이 빛남)
     put('DESK_FRONT', c, r, { bg: 0 });
     items.push({ k: 'PC_FRONT_OFF', pc: owner, x: (c + 1) * T, y: r * T - 12, w: 16, h: 32, z: r * T + 33 });
-    put('POT', c, r, { z: r * T + 34, dy: -6 }); grid[r][c].block = true;
+    const [p1, p2] = DESK_PROPS[owner];
+    prop(p1, c, r, { dy: -4, z: r * T + 34 }); prop(p2, c + 2, r, { dy: -2, z: r * T + 34 });
     put('CUSHIONED_CHAIR_BACK', c + 1, r + 2, { z: (r + 2) * T + 17, dy: -6 });
     spot('desk-' + owner, c + 1, r + 2, 'up', 'type', ['desk'], { owner, dy: -9 });
     grid[r + 2][c + 1].block = false;
   }
+  // 팀장실(칸막이)
   { const L0 = LEAD_ROOM; for (let c = L0.c0; c <= L0.c1; c++) grid[L0.r0][c].block = true;
     for (let r = L0.r0; r <= L0.r1; r++) if (!L0.doorRows.includes(r)) grid[r][L0.c0].block = true;
-    put('DOUBLE_BOOKSHELF', 27, 21); put('PLANT', 24, 21); put('COFFEE', 25, 22, { z: 22 * T + 40, dy: -2 });
-    put('WOODEN_CHAIR_FRONT', 25, 25, { z: 26 * T + 10 }); put('WOODEN_CHAIR_FRONT', 27, 25, { z: 26 * T + 10 });
-    spot('lead-visit-a', 25, 26, 'up', 'stand', ['leadvisit']); spot('lead-visit-b', 27, 26, 'up', 'stand', ['leadvisit']); }
-  put('WHITEBOARD', 24, 14, { wall: true, z: 14 * T });
-  spot('status-board', 24, 16, 'up', 'stand', ['statusboard']);
-  put('BOOKSHELF', 27, 14, { wall: true, z: 14 * T });
-  put('LARGE_PLANT', 28, 25); put('PLANT', 1, 14); put('BIN', 22, 18); put('PLANT_2', 20, 26); put('CACTUS', 1, 26);
-  put('PLANT_2', 9, 14); put('BIN', 13, 15);
+    put('DOUBLE_BOOKSHELF', 22, 9); put('PLANT', 18, 9); put('LARGE_PLANT', 23, 13); put('CLOCK', 24, 9, { free: true, dy: -6, z: 9 * T });
+    spot('lead-visit-a', 19, 13, 'up', 'stand', ['leadvisit']); spot('lead-visit-b', 21, 13, 'up', 'stand', ['leadvisit']);
+    prop('nameplate', 20, 8, { z: 8 * T + 30 }); prop('rugcat', 21, 14); }
+  // 현황판(실제 기록) + 연구실 소품
+  put('WHITEBOARD', 13, 8); spot('status-board', 13, 10, 'up', 'stand', ['statusboard']);
+  put('PLANT', 1, 8); put('BIN', 7, 11); put('PLANT_2', 15, 13); put('CACTUS', 15, 9);
+  prop('boxes', 15, 15, { block: true }); prop('umbrella', 11, 15); prop('shoes', 14, 15); prop('poster', 7, 8, { z: 8 * T });
+  // 계단(1층→2층)
+  for (let r = 12; r <= 15; r++) for (let c = 1; c <= 2; c++) grid[r][c].block = true;
   // 자료실
-  [2, 4, 6, 9, 11].forEach((c, i) => { put(i % 2 ? 'BOOKSHELF' : 'DOUBLE_BOOKSHELF', c, 2, { wall: true, z: 2 * T }); });
-  for (const c of [3, 5, 7, 10, 12]) spot('shelf-' + c, c, 4, 'up', 'read', ['shelf']);
-  put('SMALL_TABLE_FRONT', 5, 8);
-  put('WOODEN_CHAIR_SIDE', 4, 8, { z: 8 * T + 20 }); put('WOODEN_CHAIR_SIDE', 7, 8, { flip: true, z: 8 * T + 20 });
-  spot('libseat-a', 4, 9, 'right', 'read', ['libseat'], { dy: -6 }); spot('libseat-b', 7, 9, 'left', 'read', ['libseat'], { dy: -6 });
-  put('CUSHIONED_BENCH', 11, 9); put('CUSHIONED_BENCH', 12, 9);
-  spot('libbench-a', 11, 10, 'up', 'read', ['libseat'], { dy: -8 }); spot('libbench-b', 12, 10, 'up', 'read', ['libseat'], { dy: -8 });
-  put('LARGE_PLANT', 1, 10); put('POT', 13, 3);
-  // 회의실
-  put('WHITEBOARD', 22, 2, { wall: true, z: 2 * T }); put('LARGE_PAINTING', 17, 2, { wall: true, z: 2 * T }); put('CLOCK', 28, 2, { wall: true, z: 2 * T });
-  spot('board-a', 22, 4, 'up', 'stand', ['board']); spot('board-b', 23, 4, 'up', 'stand', ['board']);
-  put('TABLE_FRONT', 22, 6);
-  [[21, 7, 'right'], [21, 8, 'right'], [25, 7, 'left'], [25, 8, 'left']].forEach(([c, r, f], i) => {
+  put('DOUBLE_BOOKSHELF', 1, 2); put('DOUBLE_BOOKSHELF', 3, 2); put('BOOKSHELF', 5, 2);
+  spot('shelf-a', 2, 4, 'up', 'read', ['shelf']); spot('shelf-b', 4, 4, 'up', 'read', ['shelf']); spot('shelf-c', 6, 4, 'up', 'read', ['shelf']);
+  put('SMALL_TABLE_FRONT', 3, 5);
+  put('WOODEN_CHAIR_SIDE', 2, 5, { z: 5 * T + 20 }); put('WOODEN_CHAIR_SIDE', 5, 5, { flip: true, z: 5 * T + 20 });
+  spot('libseat-a', 2, 6, 'right', 'read', ['libseat'], { dy: -6 }); spot('libseat-b', 5, 6, 'left', 'read', ['libseat'], { dy: -6 });
+  prop('bookstack', 7, 3, { block: true }); prop('bookstack', 3, 5, { dy: -6, z: 6 * T + 10 }); prop('lamp', 6, 6, { block: true });
+  // 카페 코너
+  put('SMALL_TABLE_FRONT', 9, 2); put('COFFEE', 9, 2, { z: 2 * T + 40, dy: 2 }); put('COFFEE', 10, 2, { z: 2 * T + 40, dy: 2 });
+  spot('coffee', 10, 4, 'up', 'stand', ['coffee']);
+  put('HANGING_PLANT', 12, 2, { free: true }); grid[2][12].block = true;
+  prop('jar', 11, 3, { block: true }); prop('menu', 13, 2, { z: 3 * T });
+  spot('window-a', 8, 3, 'up', 'stand', ['window']); spot('window-b', 13, 4, 'up', 'stand', ['window']);
+  // 회의실 구석
+  put('WHITEBOARD', 15, 2); spot('board-a', 15, 4, 'up', 'stand', ['board']); spot('board-b', 16, 4, 'up', 'stand', ['board']);
+  put('TABLE_FRONT', 19, 3);
+  [[18, 5, 'right'], [18, 6, 'right'], [22, 5, 'left'], [22, 6, 'left']].forEach(([c, r, f], i) => {
     put('WOODEN_CHAIR_SIDE', c, r - 1, { flip: f === 'left', z: r * T + 1 });
     spot('meet-' + i, c, r, f, 'sit', ['meet'], { dy: -6 });
   });
-  put('PLANT', 16, 10); put('PLANT_2', 30, 10);
-  // 카페 라운지
-  put('SMALL_TABLE_FRONT', 33, 3); put('COFFEE', 33, 3, { z: 3 * T + 40 }); put('COFFEE', 34, 3, { z: 3 * T + 40 });
-  spot('coffee', 34, 5, 'up', 'stand', ['coffee']);
-  put('SOFA_FRONT', 38, 9); put('SOFA_FRONT', 41, 9); put('COFFEE_TABLE', 39, 6);
-  spot('sofa-a', 38, 9, 'down', 'sit', ['sofa'], { dy: -2, dx: 8 }); spot('sofa-b', 41, 9, 'down', 'sit', ['sofa'], { dy: -2, dx: 0 });
-  spot('sofa-c', 42, 9, 'down', 'sit', ['sofa'], { dy: -2, dx: 0 });
-  grid[9][38].block = grid[9][41].block = grid[9][42].block = false;
-  put('HANGING_PLANT', 36, 2, { wall: true, z: 2 * T }); put('LARGE_PAINTING', 43, 2, { wall: true, z: 2 * T });
-  put('LARGE_PLANT', 45, 9); put('PLANT', 32, 10); put('CACTUS', 46, 3);
-  spot('window-a', 40, 3, 'up', 'stand', ['window']);
+  put('LARGE_PAINTING', 23, 2, { free: true }); grid[2][23].block = grid[2][24].block = grid[3][23].block = grid[3][24].block = true;
+  prop('postits', 17, 2, { z: 3 * T });
+  // ── 2층 생활층 ── (x = F2X + 칸)
+  const X = c => F2X + c;
+  // 숙소: 침대 다섯
+  PEOPLE.forEach((p, i) => { const c = X(1 + i * 2), r = 3; beds.push({ owner: p.id, c, r, color: p.color }); grid[r][c].block = true; grid[r + 1][c].block = true;
+    spot('bed-' + p.id, c, r + 1, 'down', 'sleep', ['bed'], { owner: p.id }); });
+  prop('slippers', X(2), 6); prop('slippers', X(6), 6); prop('teddy', X(10), 3, { block: true }); prop('lampstand', X(10), 6, { block: true });
+  // 식당
+  put('TABLE_FRONT', X(4), 9);
+  [[X(3), 10, 'right'], [X(3), 11, 'right'], [X(7), 10, 'left'], [X(7), 11, 'left']].forEach(([c, r, f], i) => {
+    put('WOODEN_CHAIR_SIDE', c, r - 1, { flip: f === 'left', z: r * T + 1 });
+    spot('dine-' + i, c, r, f, 'sit', ['meet', 'dine'], { dy: -6 });
+  });
+  prop('fridge', X(9), 8, { block: true }); prop('bowl', X(9), 14); prop('cushion', X(10), 14);
+  // 라운지
+  put('SOFA_FRONT', X(12), 7); put('SOFA_FRONT', X(15), 7); put('COFFEE_TABLE', X(13), 4);
+  spot('sofa-a', X(12), 7, 'down', 'sit', ['sofa'], { dy: -2, dx: 8 }); spot('sofa-b', X(15), 7, 'down', 'sit', ['sofa'], { dy: -2 });
+  spot('sofa-c', X(16), 7, 'down', 'sit', ['sofa'], { dy: -2 });
+  grid[7][X(12)].block = grid[7][X(15)].block = grid[7][X(16)].block = false;
+  put('BOOKSHELF', X(11), 2); put('HANGING_PLANT', X(17), 2, { free: true }); grid[2][X(17)].block = true;
+  prop('tv', X(14), 2, { block: true, z: 3 * T }); prop('boardgame', X(13), 4, { dy: 4, z: 6 * T });
+  put('SMALL_TABLE_FRONT', X(13), 11); put('CUSHIONED_BENCH', X(12), 12); put('CUSHIONED_BENCH', X(15), 12);
+  spot('game-a', X(12), 13, 'up', 'sit', ['game'], { dy: -8 }); spot('game-b', X(15), 13, 'up', 'sit', ['game'], { dy: -8 });
+  put('PLANT', X(11), 14); put('LARGE_PLANT', X(16), 13);
+  spot('window-c', X(13), 3, 'up', 'stand', ['window']);
+  // 계단(2층→1층)
+  for (let r = 12; r <= 15; r++) for (let c = X(1); c <= X(2); c++) grid[r][c].block = true;
   // 옥상 정원
-  put('WOODEN_BENCH', 38, 17); put('WOODEN_BENCH', 39, 17); put('WOODEN_BENCH', 44, 15); put('WOODEN_BENCH', 45, 15);
-  spot('bench-a', 38, 17, 'down', 'sit', ['bench'], { dy: -4 }); spot('bench-b', 39, 17, 'down', 'sit', ['bench'], { dy: -4 });
-  spot('bench-c', 44, 15, 'down', 'sit', ['bench'], { dy: -4 }); spot('bench-d', 45, 15, 'down', 'sit', ['bench'], { dy: -4 });
-  grid[17][38].block = grid[17][39].block = grid[15][44].block = grid[15][45].block = false;
-  put('LARGE_PLANT', 33, 14); put('LARGE_PLANT', 45, 18); put('PLANT', 36, 19); put('PLANT_2', 41, 14); put('POT', 34, 19); put('CACTUS', 46, 14);
-  for (const [c, r] of [[34, 18], [37, 15], [40, 19], [36, 15]]) spot('plant-' + c, c, r, 'up', 'stand', ['plants']);
-  for (const [c, r] of [[35, 16], [41, 17], [44, 19], [40, 15], [33, 18]]) spot('walk-' + c + '-' + r, c, r, 'down', 'stand', ['stroll']);
-  for (const [c, r] of [[41, 18], [42, 18], [43, 18], [41, 19], [42, 19], [43, 19]]) grid[r][c].block = true; // 연못
-  // 숙소: 침대 다섯(직접 그림)
-  PEOPLE.forEach((p, i) => { const c = 33 + i * 3, r = 23; beds.push({ owner: p.id, c, r, color: p.color }); grid[r][c].block = true; grid[r + 1][c].block = true;
-    spot('bed-' + p.id, c, r + 1, 'down', 'sleep', ['bed'], { owner: p.id }); spot('bedside-' + p.id, c + 1, r + 2, 'up', 'stand', ['bedside'], { owner: p.id }); });
-  put('PLANT', 46, 26); put('POT', 32, 27); put('SMALL_PAINTING', 38, 22, { wall: true, z: 22 * T });
+  put('WOODEN_BENCH', X(20), 6); put('WOODEN_BENCH', X(21), 6); put('WOODEN_BENCH', X(22), 11); put('WOODEN_BENCH', X(23), 11);
+  spot('bench-a', X(20), 6, 'down', 'sit', ['bench'], { dy: -4 }); spot('bench-b', X(21), 6, 'down', 'sit', ['bench'], { dy: -4 });
+  spot('bench-c', X(22), 11, 'down', 'sit', ['bench'], { dy: -4 }); spot('bench-d', X(23), 11, 'down', 'sit', ['bench'], { dy: -4 });
+  grid[6][X(20)].block = grid[6][X(21)].block = grid[11][X(22)].block = grid[11][X(23)].block = false;
+  put('LARGE_PLANT', X(18), 2); put('PLANT', X(24), 3); put('PLANT_2', X(18), 13); put('POT', X(24), 14); put('CACTUS', X(23), 2);
+  prop('flowerbed', X(20), 3, { block: true }); prop('flowerbed', X(21), 3, { block: true }); prop('watering', X(19), 9); prop('swing', X(23), 7, { block: true });
+  for (const [c, r] of [[X(19), 4], [X(22), 4], [X(19), 14], [X(23), 13]]) spot('plant-' + c + '-' + r, c, r, 'up', 'stand', ['plants']);
+  for (const [c, r] of [[X(19), 8], [X(23), 9], [X(20), 15], [X(24), 5], [X(18), 11]]) spot('walk-' + c + '-' + r, c, r, 'down', 'stand', ['stroll']);
+  for (const [c, r] of [[X(20), 12], [X(21), 12], [X(20), 13], [X(21), 13]]) grid[r][c].block = true; // 연못
 }
 
-// ---------------------------------------------------------------- 길찾기(BFS)
+// ---------------------------------------------------------------- 길찾기(BFS) — 계단 칸은 다른 층 계단 칸과 이웃
 function passable(c, r) { return grid[r] && grid[r][c] && !grid[r][c].block; }
 function path(from, to) {
   const s = [Math.round(from.c), Math.round(from.r)], g = [to.c, to.r];
-  if (!passable(...g) && !spots.some(sp => sp.c === g[0] && sp.r === g[1])) return null;
+  if (!passable(...g) && !spots.some(sp => sp.c === g[0] && sp.r === g[1]) && !grid[g[1]]?.[g[0]]?.door) return null;
   const key = (c, r) => r * COLS + c, prev = new Map([[key(...s), -1]]), q = [s];
   for (let i = 0; i < q.length; i++) {
     const [c, r] = q[i];
     if (c === g[0] && r === g[1]) { const out = []; let k = key(c, r); while (k !== -1) { out.push([k % COLS, Math.floor(k / COLS)]); k = prev.get(k); } return out.reverse().slice(1); }
-    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nc = c + dc, nr = r + dr, k = key(nc, nr);
+    const nb = [[c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]]; const ln = LINKS.get(key(c, r)); if (ln) nb.push(ln);
+    for (const [nc, nr] of nb) {
+      const k = key(nc, nr);
       if (prev.has(k)) continue;
       if (!(passable(nc, nr) || (nc === g[0] && nr === g[1]))) continue;
       prev.set(k, key(c, r)); q.push([nc, nr]);
@@ -506,6 +555,7 @@ class Agent {
     n.coffee = clamp(n.coffee - 0.1 * dt, 0, 100);
     if (this.route.length) {
       const [c, r] = this.route[0], tx = c * T + 8, ty = r * T + 14, sp = (this.couplewalk ? 30 : 34) * simRate();
+      if (Math.abs(tx - this.x) > 3 * T) { emit('spark', this.x, this.y - 20, 2); this.x = tx; this.y = ty; this.route.shift(); emit('spark', tx, ty - 20, 2); if (!this.route.length) { this.pose = 'stand'; const f = this.onArrive; this.onArrive = null; f && f(true); } return; }
       const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy);
       if (Math.abs(dx) > Math.abs(dy)) this.face = dx > 0 ? 'right' : 'left'; else if (d > 0.1) this.face = dy > 0 ? 'down' : 'up';
       if (d <= sp * dt) { this.x = tx; this.y = ty; this.route.shift(); if (!this.route.length) { this.pose = 'stand'; const f = this.onArrive; this.onArrive = null; f && f(true); } }
@@ -561,6 +611,7 @@ class Cat {
     this.anim += dt;
     if (this.route.length) {
       const [c, r] = this.route[0], tx = c * T + 8, ty = r * T + 14, sp = 26 * simRate();
+      if (Math.abs(tx - this.x) > 3 * T) { this.x = tx; this.y = ty; this.route.shift(); return; }
       const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy);
       if (Math.abs(dx) > Math.abs(dy)) this.face = dx > 0 ? 'right' : 'left'; else if (d > .1) this.face = dy > 0 ? 'down' : 'up';
       if (d <= sp * dt) { this.x = tx; this.y = ty; this.route.shift(); if (!this.route.length) { this.state = Math.random() < .5 ? 'sit' : 'loaf'; this.t = rnd(6, 16); } }
@@ -613,14 +664,14 @@ function schedule(a) {
   return 'free';
 }
 function arrive(a) {
-  a.away = false; a.release(); a.x = 14 * T + 8; a.y = 29 * T + 14; a.pose = 'stand';
+  a.away = false; a.release(); a.x = ENTRANCE.c * T + 8; a.y = ENTRANCE.r * T + 14; a.pose = 'stand';
   a.speak(say(a, dayInfo().weekend ? 'visit' : 'arrive'), 4); log(`${a.name} ${dayInfo().weekend ? '주말에 놀러 옴' : '출근'}.`);
   const sp = spots.find(s => s.id === 'desk-' + a.id); a.gotoSpot(sp, ok => { if (ok) stay(a, rnd(8, 14), { end: x => { x.need.coffee -= 10; } }); });
 }
 function leave(a) {
   if (activeTask.has(a.id)) return;
   a.speak(say(a, 'leave'), 4); log(`${a.name} 퇴근.`);
-  a.go(14, 29, ok => { if (!ok) return; a.away = true; a.release(); stay(a, 20); });
+  a.go(ENTRANCE.c, ENTRANCE.r, ok => { if (!ok) return; a.away = true; a.release(); stay(a, 20); });
 }
 function doOvertime(a) {
   const sp = spots.find(s => s.id === 'desk-' + a.id);
@@ -635,7 +686,7 @@ function think(a) {
   if (sch === 'overtime') return doOvertime(a);
   if (sch === 'sleep') return doSleep(a);
   if (a.pose === 'sleep') { a.pose = 'stand'; a.release(); a.speak(say(a, 'greetMorning')); log(`${a.name} 기상. "${a.bubble.text}"`); emit('spark', a.x, a.y - 30, 2); a.hop = 1; a.cool = 2; return; }
-  if (sch === 'lunch') return doGather(a, 'meet', 'lunch', '점심');
+  if (sch === 'lunch') return doGather(a, 'dine', 'lunch', '점심');
   if (sch === 'tea') return doGather(a, 'sofa', 'tea', '티타임');
   // 연인과 함께하기(저녁일수록 자주)
   const partner = coupleOf(a), h = hourNow();
@@ -722,7 +773,7 @@ function doCat(a) {
 }
 function doOutwalk(a) {
   a.speak(say(a, 'outwalk'), 3.5); log(`${a.name}, 바깥 산책을 나감.`);
-  a.go(14, 29, ok => { if (!ok) return; a.away = true; a.release(); stay(a, rnd(30, 60), { end: x => { x.away = false; x.y = 29 * T + 14; x.x = 14 * T + 8; x.speak(say(x, 'back')); log(`${x.name}, 산책에서 돌아옴.`); x.need.fun = 90; } }); });
+  a.go(ENTRANCE.c, ENTRANCE.r, ok => { if (!ok) return; a.away = true; a.release(); stay(a, rnd(30, 60), { end: x => { x.away = false; x.y = ENTRANCE.r * T + 14; x.x = ENTRANCE.c * T + 8; x.speak(say(x, 'back')); log(`${x.name}, 산책에서 돌아옴.`); x.need.fun = 90; } }); });
 }
 function doSleep(a) {
   if (a.pose === 'sleep') { stay(a, 6, { tick: (x, dt) => { if (Math.random() < dt * 0.7) { const b = beds.find(b => b.owner === x.id); emit('z', b.c * T + 10, b.r * T - 2, 1); } } }); return; }
@@ -756,11 +807,12 @@ function talk(a, b, turns, onDone) {
   const face = () => { a.face = b.x > a.x + 4 ? 'right' : b.x < a.x - 4 ? 'left' : b.y > a.y ? 'down' : 'up'; b.face = a.x > b.x + 4 ? 'right' : a.x < b.x - 4 ? 'left' : a.y > b.y ? 'down' : 'up'; };
   if (Math.hypot(a.x - b.x, a.y - b.y) > 3 * T) { a.act = { t: 1 }; b.act = null; return; }
   b.route = [];
+  a.talkWith = b.id; b.talkWith = a.id;
   face(); let i = 0, gap = 0;
   const lines = turns;
   const t = lines.length * 3.4 + 0.5;
   const tick = (x, dt) => { gap -= dt; if (gap <= 0 && i < lines.length) { const [who, text, fx] = lines[i++]; if (text) (who ? b : a).speak(text, 3.2); if (fx) fx(); gap = text ? 3.4 : 0.6; } };
-  a.act = { t, talk: true, tick, end: () => onDone && onDone() }; b.act = { t, talk: true };
+  a.act = { t, talk: true, tick, end: () => { a.talkWith = b.talkWith = null; onDone && onDone(); } }; b.act = { t, talk: true };
 }
 function doChat(a) {
   const cand = nearestFree(a).slice(0, 3); if (!cand.length) return doWindow(a);
@@ -839,7 +891,7 @@ function doConfess(a, b) {
 // 원장 기록: 2026-11-10 14:19:46Z 접수 → 수집 2건(retrieved) → 초안(gpt-6.1-terra) → 검토(gpt-6-sol, revise 3건) → 수정 → 완료, 내부 $0.054158
 const REAL = [
   { who: 'lead', at: '23:19', go: 'status-board', text: '지시 T24-1 접수 (시험)', pose: 'stand', secs: 7 },
-  { who: 'research', at: '23:19', go: 'shelf-5', text: '법령 조문 2건 수집 완료 · 개인정보 보호법 제34조, 정보통신망법 제48조의3', pose: 'read', secs: 9 },
+  { who: 'research', at: '23:19', go: 'shelf-b', text: '법령 조문 2건 수집 완료 · 개인정보 보호법 제34조, 정보통신망법 제48조의3', pose: 'read', secs: 9 },
   { who: 'research', at: '23:20', hand: 'writer', text: '원문 전달', secs: 3 },
   { who: 'writer', at: '23:20', go: 'desk-writer', text: '초안 작성 (gpt-6.1-terra, 1,240자)', pose: 'type', secs: 9 },
   { who: 'writer', at: '23:20', hand: 'reviewer', text: '초안을 별도 세션 검토로', secs: 3 },
@@ -856,7 +908,7 @@ async function replay() {
   const ag = id => agents.find(a => a.id === id);
   for (const a of agents) { if (a.pose === 'sleep') { a.pose = 'stand'; a.release(); } a.away = false; }
   for (const step of REAL) {
-    const a = ag(step.who); a.real = step; a.act = null; a.route = []; if (a.away) { a.away = false; a.x = 14 * T + 8; a.y = 29 * T + 14; }
+    const a = ag(step.who); a.real = step; a.act = null; a.route = []; if (a.away) { a.away = false; a.x = ENTRANCE.c * T + 8; a.y = ENTRANCE.r * T + 14; }
     await new Promise(res => {
       const doIt = () => {
         a.speak(step.text, step.secs + 1, true);
@@ -887,70 +939,118 @@ function tintFloor(key, hex) {
 }
 const FLOORS = { 1: ['floor_1', '#caa676'], 2: ['floor_3', '#b7c2c9'], 3: ['floor_6', '#d9b49d'], 4: ['floor_2', '#c3c8ad'], 6: ['floor_4', '#c9badb'] };
 let staticLayer = null;
+const rand = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })(); // 매번 같은 무늬
 function buildStatic() {
   const c = document.createElement('canvas'); c.width = COLS * T; c.height = ROWS * T; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
   g.fillStyle = '#2b241d'; g.fillRect(0, 0, c.width, c.height);
-  for (let r = 0; r < ROWS; r++) for (let cc = 0; cc < COLS; cc++) {
-    const t = grid[r][cc];
-    if (t.wall) continue;
-    if (t.room === 5) { // 잔디
-      g.fillStyle = '#86b468'; g.fillRect(cc * T, r * T, T, T); for (let k = 0; k < 3; k++) { g.fillStyle = Math.random() < .5 ? 'rgba(255,255,255,.05)' : 'rgba(0,40,0,.05)'; g.fillRect(cc * T + Math.floor(Math.random() * 12), r * T + Math.floor(Math.random() * 12), 4 + Math.floor(Math.random() * 4), 3); }
-      for (let k = 0; k < 5; k++) { g.fillStyle = Math.random() < .5 ? '#6f9d56' : '#97c57a'; g.fillRect(cc * T + Math.floor(Math.random() * 15), r * T + Math.floor(Math.random() * 15), 1, 2); }
-      if (Math.random() < 0.12) { g.fillStyle = pick(['#ffd1dc', '#fff3a8', '#ffffff', '#f6a5b5']); const fx = cc * T + 4 + Math.floor(Math.random() * 8), fy = r * T + 4 + Math.floor(Math.random() * 8); g.fillRect(fx, fy, 2, 2); g.fillStyle = '#e9b949'; g.fillRect(fx, fy, 1, 1); }
-      continue;
-    }
-    continue; // 나무 바닥은 방 단위로 아래에서 그림
-  }
-  // 연못(정원)
-  g.fillStyle = '#4f86b8'; g.fillRect(41 * T + 4, 18 * T + 4, 30, 18); g.fillStyle = '#76a9d6'; g.fillRect(41 * T + 7, 18 * T + 6, 12, 3);
-  // 나무 판자 바닥(엇갈린 판자·결·이음새) — v1 사무실 바닥 방식
-  const WOOD = { 1: [['#b98e62', '#b2875b', '#bf956a', '#b48a5f'], '#94704b'], 2: [['#e2cfaa', '#dcc8a1', '#e7d5b3', '#dfcca6'], '#c3ad86'],
-    3: [['#d9b98f', '#d3b287', '#dfc199', '#d6b68c'], '#b99a71'], 4: [['#d4b58d', '#cfad81', '#d8ba94', '#d0b087'], '#b89970'], 6: [['#dcc3a2', '#d6bc99', '#e1c9a9', '#d9c09d'], '#bea383'] };
-  for (const [room, [cols, seam]] of Object.entries(WOOD)) {
-    const [c0, r0, c1, r1] = ROOM_VIEW[room]; const x0 = c0 * T, y0 = r0 * T, w = (c1 - c0 + 1) * T, h = (r1 - r0 + 1) * T;
+  // 나무 판자 바닥(층마다 나무색): v1 사무실 방식
+  const plank = (x0, y0, w, h, cols, seam) => {
     g.save(); g.beginPath(); g.rect(x0, y0, w, h); g.clip();
     for (let row = 0, y = y0; y < y0 + h; row++, y += 8) {
       let x = x0 - ((row * 13) % 40);
       for (let k = 0; x < x0 + w; k++) { const len = 34 + ((row * 7 + k * 11) % 4) * 6;
         g.fillStyle = cols[(k + row * 3) % cols.length]; g.fillRect(x, y, len - 1, 7);
         g.fillStyle = seam; g.fillRect(x + len - 1, y, 1, 7);
-        if ((k + row) % 3 === 0) { g.fillStyle = 'rgba(120,86,52,.14)'; g.fillRect(x + 6, y + 3, Math.min(14, len - 10), 1); }
+        if ((k + row) % 3 === 0) { g.fillStyle = 'rgba(120,86,52,.13)'; g.fillRect(x + 6, y + 3, Math.min(14, len - 10), 1); }
         x += len; }
       g.fillStyle = seam; g.fillRect(x0, y + 7, w, 1);
     }
     g.restore();
+  };
+  plank(1 * T, 2 * T, 24 * T, 14 * T, ['#d4b58d', '#cfad81', '#d8ba94', '#d0b087'], '#b89970');                 // 1층
+  plank((F2X + 1) * T, 2 * T, 24 * T, 14 * T, ['#dcc3a2', '#d6bc99', '#e1c9a9', '#d9c09d'], '#bea383');         // 2층
+  // 정원 잔디(2층 오른쪽)
+  for (let r = 2; r <= 15; r++) for (let cc = F2X + 18; cc <= F2X + 24; cc++) {
+    g.fillStyle = '#88b66a'; g.fillRect(cc * T, r * T, T, T);
+    for (let k = 0; k < 3; k++) { g.fillStyle = rand() < .5 ? 'rgba(255,255,255,.06)' : 'rgba(0,40,0,.06)'; g.fillRect(cc * T + Math.floor(rand() * 12), r * T + Math.floor(rand() * 12), 4 + Math.floor(rand() * 4), 3); }
+    for (let k = 0; k < 5; k++) { g.fillStyle = rand() < .5 ? '#6f9d56' : '#9cc97f'; g.fillRect(cc * T + Math.floor(rand() * 15), r * T + Math.floor(rand() * 15), 1, 2); }
+    if (rand() < 0.16) { g.fillStyle = ['#ffd1dc', '#fff3a8', '#ffffff', '#f6a5b5', '#c9b6ff'][Math.floor(rand() * 5)]; const fx = cc * T + 3 + Math.floor(rand() * 9), fy = r * T + 3 + Math.floor(rand() * 9); g.fillRect(fx, fy, 2, 2); g.fillStyle = '#e9b949'; g.fillRect(fx, fy, 1, 1); }
   }
-  // 문턱(문 칸)도 같은 바닥
-  for (let r = 0; r < ROWS; r++) for (let cc = 0; cc < COLS; cc++) if (grid[r][cc].door) { g.fillStyle = '#c8a77c'; g.fillRect(cc * T, r * T, T, T); g.fillStyle = '#a98a62'; g.fillRect(cc * T, r * T + 7, T, 1); }
-  // 러그(v1식: 그림자·테두리·안쪽 바느질선)
+  g.fillStyle = '#7aa85d'; g.fillRect((F2X + 18) * T - 2, 2 * T, 2, 14 * T); // 잔디 경계
+  // 연못
+  g.fillStyle = '#3f74a6'; g.fillRect((F2X + 20) * T + 2, 12 * T + 3, 28, 26); g.fillStyle = '#5f97cb'; g.fillRect((F2X + 20) * T + 4, 12 * T + 5, 24, 22);
+  g.fillStyle = '#9cc7ea'; g.fillRect((F2X + 20) * T + 8, 12 * T + 9, 8, 2); g.fillStyle = '#4f9a54'; g.fillRect((F2X + 21) * T + 4, 13 * T + 6, 5, 3); // 연잎
+  // 징검돌
+  for (const [cc, r] of [[F2X + 19, 3], [F2X + 19, 5], [F2X + 20, 7], [F2X + 21, 8], [F2X + 22, 9], [F2X + 22, 13], [F2X + 23, 14], [F2X + 19, 11]]) {
+    g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(cc * T + 3, r * T + 5, 11, 8); g.fillStyle = '#d8d2c4'; g.fillRect(cc * T + 2, r * T + 3, 11, 8); g.fillStyle = '#ebe6da'; g.fillRect(cc * T + 3, r * T + 4, 5, 2); }
+  // 러그(v1식: 그림자·테두리·안쪽 바느질선)로 구역 표시
   const rug = (x, y, w, h, col, border) => { g.fillStyle = 'rgba(66,44,26,.12)'; g.fillRect(x + 2, y + 2, w, h); g.fillStyle = border; g.fillRect(x, y, w, h);
     g.fillStyle = col; g.fillRect(x + 3, y + 3, w - 6, h - 6); g.strokeStyle = border; g.lineWidth = 1; g.strokeRect(x + 6.5, y + 6.5, w - 13, h - 13); };
-  rug(37 * T + 8, 5 * T + 8, 7 * T, 4 * T, '#e4a99b', '#f6dcd2');   // 라운지
-  rug(3 * T, 6 * T + 8, 8 * T, 5 * T, '#c7c8ad', '#eeead7');        // 자료실 독서
-  rug(20 * T, 5 * T + 8, 8 * T, 6 * T, '#7d947f', '#d1d2ad');      // 회의실
-  rug(2 * T, 18 * T + 8, 20 * T, 7 * T, '#b8b396', '#e0d5b7');     // 연구실 책상 구역
-  rug(24 * T + 4, 21 * T + 4, 5 * T + 8, 6 * T + 8, '#c9a96e', '#f1dfb4');  // 팀장실
-  { const L0 = LEAD_ROOM, part = (c, r) => { const x = c * T, y = r * T; g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x + 2, y + 13, T, 3);
+  rug(1 * T + 4, 4 * T + 6, 6 * T + 4, 3 * T + 6, '#c7c8ad', '#eeead7');          // 자료실
+  rug(14 * T + 6, 3 * T + 8, 10 * T + 4, 4 * T + 4, '#7d947f', '#d1d2ad');        // 회의실
+  rug(3 * T + 6, 8 * T + 10, 10 * T + 4, 7 * T + 2, '#b8b396', '#e0d5b7');        // 연구실
+  rug(18 * T + 4, 9 * T + 6, 6 * T + 6, 6 * T + 4, '#c9a96e', '#f1dfb4');         // 팀장실
+  rug((F2X + 1) * T + 2, 5 * T + 4, 10 * T, 2 * T + 6, '#a9a1c9', '#e2dcef');     // 숙소
+  rug((F2X + 11) * T + 6, 3 * T + 8, 6 * T + 4, 5 * T + 8, '#e4a99b', '#f6dcd2'); // 라운지
+  rug((F2X + 2) * T + 6, 8 * T + 8, 7 * T + 4, 6 * T + 4, '#d9c79a', '#f3ead0'); // 식당
+  rug((F2X + 11) * T + 6, 10 * T + 6, 6 * T + 4, 5 * T, '#9fc2c9', '#e1eef0');   // 놀이 구석
+  // 팀장실 칸막이(나무 + 간유리)
+  { const L0 = LEAD_ROOM, part = (cc, r) => { const x = cc * T, y = r * T; g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x + 2, y + 13, T, 3);
       g.fillStyle = '#8b6a4a'; g.fillRect(x, y + 6, T, 9); g.fillStyle = '#d7e6ec'; g.fillRect(x + 1, y, T - 2, 7); g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(x + 3, y + 1, 4, 1);
       g.fillStyle = '#6d5139'; g.fillRect(x, y + 6, T, 1); g.fillRect(x, y + 14, T, 1); };
-    for (let c = L0.c0; c <= L0.c1; c++) part(c, L0.r0);
+    for (let cc = L0.c0; cc <= L0.c1; cc++) part(cc, L0.r0);
     for (let r = L0.r0 + 1; r <= L0.r1; r++) if (!L0.doorRows.includes(r)) part(L0.c0, r); }
-  rug(35 * T, 25 * T, 8 * T, 3 * T, '#a9a1c9', '#e2dcef');          // 숙소
-  // 정원 징검돌 길
-  for (const [c, r] of [[39, 14], [38, 15], [37, 16], [36, 17], [35, 18], [35, 19], [40, 16], [41, 16], [43, 16], [44, 17]]) {
-    g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(c * T + 3, r * T + 5, 11, 8); g.fillStyle = '#d8d2c4'; g.fillRect(c * T + 2, r * T + 3, 11, 8); g.fillStyle = '#ebe6da'; g.fillRect(c * T + 3, r * T + 4, 5, 2); }
+  // 계단(1층: 올라가는 계단, 2층: 내려가는 계단)
+  for (const f of [1, 2]) { const [sc, sr] = STAIRS[f].draw;
+    for (let k = 0; k < 8; k++) { const y = (sr * T) + k * 8, shade = f === 1 ? 0.9 - k * 0.05 : 0.55 + k * 0.05;
+      g.fillStyle = `rgba(${Math.round(196 * shade)},${Math.round(160 * shade)},${Math.round(118 * shade)},1)`; g.fillRect(sc * T, y, 2 * T, 7); g.fillStyle = '#7a5c40'; g.fillRect(sc * T, y + 7, 2 * T, 1); }
+    g.fillStyle = '#5b4330'; g.fillRect(sc * T - 1, sr * T, 2, 4 * T); g.fillRect((sc + 2) * T - 1, sr * T, 2, 4 * T);
+    g.fillStyle = '#fff9e8'; g.fillRect((sc + 2) * T + 2, sr * T + 2, 26, 10); g.fillStyle = '#2e4e39'; g.font = '7px sans-serif'; g.fillText(f === 1 ? '2층 ↑' : '1층 ↓', (sc + 2) * T + 4, sr * T + 10); }
+  // 정문 매트
+  g.fillStyle = '#9b5f4a'; g.fillRect(12 * T, 15 * T + 4, 2 * T, 11); g.fillStyle = '#c47d63'; g.fillRect(12 * T + 2, 15 * T + 6, 2 * T - 4, 7);
   // 벽(윗면 + 앞면)
   for (let r = 0; r < ROWS; r++) for (let cc = 0; cc < COLS; cc++) {
-    if (!grid[r][cc].wall) continue;
+    const t = grid[r][cc]; if (!t.wall) { if (t.door) { g.fillStyle = '#c8a77c'; g.fillRect(cc * T, r * T, T, T); } continue; }
+    if (cc === 26 || cc === 27) continue; // 층 사이 빈칸
     const below = grid[r + 1] && grid[r + 1][cc] && !grid[r + 1][cc].wall;
     g.fillStyle = '#eee7d8'; g.fillRect(cc * T, r * T, T, T);
     g.fillStyle = '#a7835d'; g.fillRect(cc * T, r * T + T - 3, T, 3);
     if (below) { g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(cc * T, (r + 1) * T, T, 3); }
   }
-  // 바깥 벽 윗줄 앞면(창문 자리)
-  for (let cc = 1; cc < COLS - 1; cc++) { g.fillStyle = '#f2ecdd'; g.fillRect(cc * T, 1 * T, T, T); g.fillStyle = '#345546'; g.fillRect(cc * T, 1 * T + 9, T, 6);
+  // 바깥 벽 윗줄 앞면: 크림 벽 + 초록 징두리 + 나무 몰딩(v1)
+  for (const [c0, c1] of [[1, 24], [F2X + 1, F2X + 24]]) for (let cc = c0; cc <= c1; cc++) {
+    g.fillStyle = '#f2ecdd'; g.fillRect(cc * T, 1 * T, T, T); g.fillStyle = '#345546'; g.fillRect(cc * T, 1 * T + 9, T, 6);
     g.fillStyle = '#294739'; if (cc % 3 === 0) g.fillRect(cc * T + 4, 1 * T + 10, 1, 5); g.fillStyle = '#947956'; g.fillRect(cc * T, 2 * T - 1, T, 1); g.fillRect(cc * T, 1 * T + 8, T, 1); }
   return c;
+}
+// 소품 그리기(작은 픽셀 그림). 좌표는 기본 단위(px), S배로 그림
+function px(x, y, w, h, col) { cx.fillStyle = col; cx.fillRect(Math.round(x) * S, Math.round(y) * S, w * S, h * S); }
+function drawProp(p) {
+  const x = p.x, y = p.y, t = performance.now() / 1000;
+  switch (p.kind) {
+    case 'books': px(x + 2, y + 6, 10, 3, '#7f4938'); px(x + 3, y + 3, 9, 3, '#6a7759'); px(x + 2, y + 1, 8, 2, '#c1aa78'); break;
+    case 'tea': px(x + 3, y + 7, 7, 5, '#f4efe6'); px(x + 4, y + 7, 5, 1, '#a46a3c'); px(x + 10, y + 8, 2, 3, '#f4efe6'); if (Math.floor(t * 2) % 2) px(x + 6, y + 3, 1, 2, 'rgba(255,255,255,.7)'); break;
+    case 'notes': px(x + 1, y + 4, 5, 5, '#ffe28a'); px(x + 6, y + 6, 5, 5, '#a8e0ff'); px(x + 3, y + 9, 5, 5, '#ffb3c7'); break;
+    case 'mug': px(x + 4, y + 7, 6, 6, '#e07a5f'); px(x + 10, y + 8, 2, 3, '#e07a5f'); px(x + 5, y + 9, 4, 1, '#fff'); break;
+    case 'flower': px(x + 5, y + 7, 5, 6, '#9ad1d4'); px(x + 7, y + 3, 1, 4, '#4f9a54'); px(x + 5, y + 1, 2, 2, '#ff8fab'); px(x + 8, y + 2, 2, 2, '#ffd166'); break;
+    case 'memo': px(x + 2, y + 7, 8, 6, '#fffaf0'); px(x + 3, y + 9, 6, 1, '#b7a99a'); px(x + 3, y + 11, 4, 1, '#b7a99a'); break;
+    case 'files': px(x + 2, y + 5, 9, 8, '#7d93b8'); px(x + 3, y + 3, 9, 8, '#a7b8d6'); px(x + 4, y + 5, 5, 1, '#fff'); break;
+    case 'glasses': px(x + 3, y + 9, 3, 2, '#3b3128'); px(x + 7, y + 9, 3, 2, '#3b3128'); px(x + 6, y + 9, 1, 1, '#3b3128'); break;
+    case 'robot': px(x + 3, y + 5, 7, 7, '#b7c4cf'); px(x + 4, y + 7, 2, 2, Math.floor(t * 3) % 2 ? '#ff6b6b' : '#ffd166'); px(x + 7, y + 7, 2, 2, '#ffd166'); px(x + 6, y + 2, 1, 3, '#7a8791'); break;
+    case 'tools': px(x + 2, y + 9, 9, 2, '#d17a22'); px(x + 3, y + 6, 2, 3, '#7a8791'); px(x + 8, y + 7, 3, 2, '#e9c46a'); break;
+    case 'nameplate': px(x - 4, y + 9, 24, 7, '#fff9e8'); px(x - 4, y + 9, 24, 1, '#8b9b77'); break;
+    case 'rugcat': px(x + 2, y + 6, 12, 7, '#f1dfb4'); px(x + 4, y + 8, 3, 3, '#d9a066'); break;
+    case 'boxes': px(x + 1, y + 4, 12, 10, '#c49a6c'); px(x + 1, y + 8, 12, 1, '#9b7653'); px(x + 4, y, 8, 5, '#d8b07f'); break;
+    case 'umbrella': px(x + 6, y + 1, 2, 13, '#3b3128'); px(x + 3, y + 1, 8, 4, '#6fa8dc'); break;
+    case 'shoes': px(x + 2, y + 10, 5, 3, '#e07a5f'); px(x + 8, y + 10, 5, 3, '#e07a5f'); break;
+    case 'poster': px(x - 2, y + 1, 14, 12, '#fff9e8'); px(x, y + 3, 10, 4, '#8cc184'); px(x, y + 8, 7, 1, '#6b6157'); px(x, y + 10, 9, 1, '#6b6157'); break;
+    case 'bookstack': px(x + 2, y + 9, 11, 3, '#7f4938'); px(x + 3, y + 6, 10, 3, '#466c8a'); px(x + 2, y + 3, 9, 3, '#c1aa78'); break;
+    case 'lamp': px(x + 6, y + 5, 2, 9, '#5b4330'); px(x + 3, y + 1, 8, 5, '#ffe9a8'); px(x + 4, y + 13, 6, 2, '#5b4330'); break;
+    case 'jar': px(x + 3, y + 6, 8, 8, 'rgba(220,240,255,.85)'); px(x + 4, y + 9, 6, 4, '#c98a4b'); px(x + 3, y + 5, 8, 2, '#8b6a4a'); break;
+    case 'menu': px(x + 1, y - 2, 13, 10, '#2f3b33'); px(x + 3, y, 7, 1, '#fff'); px(x + 3, y + 3, 5, 1, '#ffd166'); px(x + 3, y + 5, 8, 1, '#fff'); break;
+    case 'postits': for (let k = 0; k < 6; k++) px(x - 6 + k * 4, y + 4 + (k % 2) * 4, 3, 3, ['#ffe28a', '#ffb3c7', '#a8e0ff'][k % 3]); break;
+    case 'slippers': px(x + 2, y + 10, 4, 3, '#f4a6b8'); px(x + 8, y + 10, 4, 3, '#f4a6b8'); break;
+    case 'teddy': px(x + 3, y + 5, 9, 9, '#c68b59'); px(x + 3, y + 3, 3, 3, '#c68b59'); px(x + 9, y + 3, 3, 3, '#c68b59'); px(x + 5, y + 8, 1, 1, '#3b3128'); px(x + 9, y + 8, 1, 1, '#3b3128'); px(x + 6, y + 10, 3, 2, '#f1d1b0'); break;
+    case 'lampstand': px(x + 6, y + 4, 2, 10, '#5b4330'); px(x + 2, y, 10, 5, '#fff3c4'); break;
+    case 'fridge': px(x + 1, y - 6, 14, 21, '#e8eef2'); px(x + 1, y + 1, 14, 1, '#b9c4cc'); px(x + 12, y - 3, 1, 3, '#8a979f'); px(x + 4, y - 4, 3, 3, '#ffb3c7'); break;
+    case 'bowl': px(x + 3, y + 10, 9, 3, '#e07a5f'); px(x + 4, y + 9, 7, 2, '#a46a3c'); break;
+    case 'cushion': px(x + 1, y + 7, 14, 7, '#c9b6ff'); px(x + 3, y + 9, 10, 3, '#ddd0ff'); break;
+    case 'tv': px(x - 2, y - 2, 20, 13, '#2f2a24'); px(x, y, 16, 9, ['#8fd3ff', '#ffd1dc', '#c9f2c7'][Math.floor(t / 4) % 3]); px(x + 6, y + 11, 4, 3, '#2f2a24'); break;
+    case 'boardgame': px(x + 4, y + 2, 20, 12, '#f6e9d6'); for (let k = 0; k < 4; k++) px(x + 6 + k * 4, y + 4 + (k % 2) * 3, 3, 3, ['#ef6f6c', '#5b6dc8', '#ffd166', '#8cc184'][k]); break;
+    case 'flowerbed': px(x, y + 6, 16, 9, '#8b6a4a'); for (let k = 0; k < 4; k++) { px(x + 2 + k * 4, y + 3, 1, 4, '#4f9a54'); px(x + 1 + k * 4, y + 1 + (k % 2), 3, 3, ['#ff8fab', '#ffd166', '#ffffff', '#c9b6ff'][k]); } break;
+    case 'watering': px(x + 3, y + 8, 8, 6, '#6fa8dc'); px(x + 11, y + 8, 4, 1, '#6fa8dc'); px(x + 5, y + 6, 4, 2, '#6fa8dc'); break;
+    case 'swing': { const sw = Math.sin(t * 1.6) * 1.5; px(x + 1, y - 10, 1, 24, '#5b4330'); px(x + 14, y - 10, 1, 24, '#5b4330'); px(x + 1, y - 10, 14, 2, '#5b4330'); px(x + 4 + sw, y + 4, 8, 3, '#c98a4b'); px(x + 5 + sw, y - 8, 1, 12, '#8b6a4a'); px(x + 10 + sw, y - 8, 1, 12, '#8b6a4a'); break; }
+  }
 }
 function skyColor(h) {
   const stops = [[0, '#18223f'], [5, '#2a3560'], [6.5, '#f3b391'], [8, '#9fd0f2'], [16.5, '#8fc5ee'], [18, '#f7a072'], [19.2, '#7b5ea7'], [20.5, '#24305a'], [24, '#18223f']];
@@ -961,7 +1061,7 @@ function skyColor(h) {
 function darkness(h) { if (h >= 7 && h <= 17.5) return 0; if (h > 17.5 && h < 20.5) return (h - 17.5) / 3 * 0.42; if (h >= 20.5 || h < 5.5) return 0.42; return (7 - h) / 1.5 * 0.42; }
 function drawWindows(h) {
   const sky = skyColor(h);
-  for (const c0 of [3, 9, 18, 26, 34, 41, 44]) {
+  for (const c0 of WINDOWS) {
     cx.fillStyle = '#6b5a45'; cx.fillRect(c0 * T * S, (1 * T + 2) * S, 24 * S, 12 * S);
     cx.fillStyle = sky; cx.fillRect((c0 * T + 1) * S, (1 * T + 3) * S, 22 * S, 10 * S);
     if (h > 20 || h < 5) { cx.fillStyle = '#fff6c9'; cx.fillRect((c0 * T + 5 + (c0 % 7)) * S, (1 * T + 5) * S, S, S); cx.fillRect((c0 * T + 15) * S, (1 * T + 9) * S, S, S); }
@@ -1004,7 +1104,7 @@ function render(dt) {
   cx.drawImage(staticLayer, 0, 0, COLS * T * S, ROWS * T * S);
   drawWindows(h);
   drawBeds();
-  const list = [...items.map(i => ({ z: i.z, d: () => drawItem(i) })), ...agents.map(a => ({ z: a.y + (a.spot && a.spot.face === 'down' && a.spot.pose !== 'type' ? 6 : 0), d: () => a.draw() })), ...cats.map(c => ({ z: c.y - 1, d: () => c.draw() }))];
+  const list = [...items.map(i => ({ z: i.z, d: () => drawItem(i) })), ...props.map(p => ({ z: p.z, d: () => drawProp(p) })), ...agents.map(a => ({ z: a.y + (a.spot && a.spot.face === 'down' && a.spot.pose !== 'type' ? 6 : 0), d: () => a.draw() })), ...cats.map(c => ({ z: c.y - 1, d: () => c.draw() }))];
   list.sort((a, b) => a.z - b.z).forEach(o => o.d());
   // 들고 다니는 종이·커피
   for (const a of agents) if (a.carry && !a.away) { cx.fillStyle = a.real ? '#ffffff' : '#8a5a3b'; cx.fillRect((a.x + 4) * S, (a.y - 16) * S, 4 * S, 4 * S); }
@@ -1013,7 +1113,7 @@ function render(dt) {
   if (dk > 0) {
     cx.fillStyle = `rgba(16,20,48,${dk})`; cx.fillRect(cam.x * S, cam.y * S, cv.width, cv.height);
     cx.globalCompositeOperation = 'lighter';
-    for (const [lx, ly, rr] of [[8, 7, 70], [23, 7, 70], [39, 7, 80], [12, 21, 110], [39, 25, 60], [24, 15, 40]]) {
+    for (const [lx, ly, rr] of LIGHTS) {
       const g = cx.createRadialGradient(lx * T * S, ly * T * S, 4, lx * T * S, ly * T * S, rr * S);
       g.addColorStop(0, `rgba(255,214,140,${dk * 0.55})`); g.addColorStop(1, 'rgba(255,214,140,0)'); cx.fillStyle = g; cx.fillRect(cam.x * S, cam.y * S, cv.width, cv.height);
     }
@@ -1029,43 +1129,65 @@ function render(dt) {
   drawParts(dt);
   // 방 이름
   cx.font = `${9 * S}px ${getComputedStyle(document.body).fontFamily}`; cx.fillStyle = 'rgba(60,48,36,.55)';
-  for (const [n, c, r] of [['자료실', 2, 12.6], ['회의실', 17, 12.6], ['카페 라운지', 33, 12.6], ['연구실', 2, 28.6], ['팀장실 · 지피', 24.2, 20.75], ['옥상 정원', 33, 20.6], ['숙소', 33, 28.6]]) cx.fillText(n, c * T * S, r * T * S);
+  for (const [n, c, r] of LABELS) cx.fillText(n, c * T * S, r * T * S);
 }
 
 // ---------------------------------------------------------------- 말풍선·이름표(HTML)
 const tags = new Map();
-let selected = 'research';
+let selected = 'research', viewFloor = 1;
+const small = () => document.getElementById('stage').clientWidth < 640;
+const tickerEl = document.getElementById('ticker');
+let tickerLine = null;
+function agentPos(a) { const b = a.pose === 'sleep' && beds.find(b => b.owner === a.id);
+  return b ? [b.c * T + 8, b.r * T + 2] : [a.x + (a.spot ? a.spot.dx : 0), a.y + (a.spot ? a.spot.dy : 0)]; }
 function overlay() {
-  const W = cv.clientWidth, H = cv.clientHeight, sc = W / (VW * T);
+  const W = cv.clientWidth, H = cv.clientHeight, sc = W / (VW * T), sm = small();
+  const sel = agents.find(a => a.id === selected);
   for (const a of agents) {
     let t = tags.get(a.id);
     if (!t) { t = { name: document.createElement('div'), bub: document.createElement('div') }; t.name.className = 'name'; t.bub.className = 'bubble'; ov.append(t.name, t.bub); tags.set(a.id, t); }
-    const sleeping = a.pose === 'sleep', b = beds.find(b => b.owner === a.id);
-    const px = sleeping ? b.c * T + 8 : a.x + (a.spot ? a.spot.dx : 0), py = sleeping ? b.r * T + 2 : a.y + (a.spot ? a.spot.dy : 0);
-    const ox = (px - cam.x) * sc, oy = (py - cam.y) * sc, inView = ox > -20 && ox < W + 20 && oy > 0 && oy < H + 40;
-    t.name.hidden = a.away || !inView; t.name.textContent = a.name; t.name.classList.toggle('sel', a.id === selected);
+    const [px, py] = agentPos(a);
+    const ox = (px - cam.x) * sc, oy = (py - cam.y) * sc, inView = !a.away && floorOf(px) === viewFloor && ox > -20 && ox < W + 20 && oy > 0 && oy < H + 40;
+    t.name.hidden = !inView; t.name.textContent = a.name; t.name.classList.toggle('sel', a.id === selected);
     t.name.style.left = ox + 'px'; t.name.style.top = oy + 'px';
-    if (a.bubble && !a.away && inView) {
-      t.bub.hidden = false; t.bub.classList.toggle('real', a.bubble.real);
-      const html = a.bubble.real ? '<span class="tag">실제 기록 · 시험</span>' : '';
-      if (t.bub.dataset.text !== a.bubble.text) { t.bub.innerHTML = html; t.bub.append(document.createTextNode(a.bubble.text)); t.bub.dataset.text = a.bubble.text; }
-      t.bub.style.left = clamp(ox, 70, W - 70) + 'px'; t.bub.style.top = Math.max(46, oy - 34 * sc) + 'px';
+    if (a.bubble && inView) {
+      // 작은 화면: 따라가는 사람과 그 대화 상대만 전체 말풍선, 나머지는 💬
+      const full = !sm || a.real || a.id === selected || (sel && (a.talkWith === selected || sel.talkWith === a.id));
+      t.bub.hidden = false; t.bub.classList.toggle('real', !!a.bubble.real); t.bub.classList.toggle('mini', !full);
+      const key = (full ? 'F' : 'M') + a.bubble.text;
+      if (t.bub.dataset.key !== key) { t.bub.textContent = ''; if (full && a.bubble.real) { const s = document.createElement('span'); s.className = 'tag'; s.textContent = '실제 기록 · 시험'; t.bub.append(s); }
+        t.bub.append(document.createTextNode(full ? a.bubble.text : '💬')); t.bub.dataset.key = key; }
+      t.bub.style.left = clamp(ox, full ? 60 : 14, W - (full ? 60 : 14)) + 'px'; t.bub.style.top = Math.max(full ? 46 : 20, oy - 34 * sc) + 'px';
     } else t.bub.hidden = true;
   }
+  // 아래 한 줄 자막: 지금 보는 층에서 가장 최근 대사
+  const lines = agents.filter(a => a.bubble && !a.away && floorOf(agentPos(a)[0]) === viewFloor).sort((x, y) => (x.id === selected ? -1 : 0) - (y.id === selected ? -1 : 0) || y.bubble.t - x.bubble.t);
+  const ln = lines[0]; const txt = ln ? ln.name + '|' + ln.bubble.text : '';
+  if (txt !== tickerLine) { tickerLine = txt; tickerEl.textContent = '';
+    if (ln) { const b = document.createElement('b'); b.textContent = ln.name; b.style.color = ln.color; tickerEl.append(b, document.createTextNode((ln.bubble.real ? '[실제 기록·시험] ' : '') + ln.bubble.text)); }
+    else tickerEl.textContent = `${FLOOR_NAME[viewFloor]} · 조용한 순간`; }
 }
 
 // ---------------------------------------------------------------- 패널
 const peopleEl = document.getElementById('people');
+const DOING = { desk: '책상에서 일하는 중', shelf: '책 고르는 중', libseat: '독서 중', board: '화이트보드 낙서', coffee: '커피 내리는 중', sofa: '소파에서 쉬는 중', bench: '벤치에 앉아 있음',
+  plants: '화분 돌보기', window: '창밖 구경', stroll: '정원 산책', meet: '식탁·회의석에 앉아 있음', statusboard: '현황판 확인', leadvisit: '팀장실에 들름', game: '보드게임 중' };
 function panel() {
-  if (!peopleEl.children.length) for (const p of PEOPLE) { const b = document.createElement('button'); b.id = 'pick-' + p.id; b.textContent = p.name; b.onclick = () => { selected = p.id; follow = true; panel(); }; peopleEl.append(b); }
-  for (const p of PEOPLE) document.getElementById('pick-' + p.id).setAttribute('aria-pressed', String(p.id === selected));
+  if (!peopleEl.children.length) for (const p of PEOPLE) { const b = document.createElement('button'); b.id = 'pick-' + p.id; b.innerHTML = `<span class="dot" style="background:${p.color}"></span>`; b.append(p.name);
+    b.onclick = () => { selected = p.id; follow = true; panel(); }; peopleEl.append(b); }
+  for (const p of PEOPLE) document.getElementById('pick-' + p.id).setAttribute('aria-pressed', String(p.id === selected && follow));
+  for (const f of [1, 2]) { const n = agents.filter(a => !a.away && floorOf(agentPos(a)[0]) === f).length; const b = document.getElementById('f' + f);
+    b.textContent = small() ? `${f}층 ${n}` : `${f === 1 ? '1층 연구' : '2층 생활'} ${n}명`; b.setAttribute('aria-pressed', String(viewFloor === f)); }
   const a = agents.find(a => a.id === selected); if (!a) return;
-  document.getElementById('follow').textContent = follow ? `따라가는 중: ${a.name}` : '둘러보는 중';
-  const doing = a.away ? '바깥 산책 중' : a.real ? `실제 기록(시험): ${a.real.text}` : a.pose === 'sleep' ? '자는 중' : a.route.length ? '이동 중' : a.act && a.act.talk ? '대화 중' : a.spot ? ({ desk: '책상에서 개인 시간', shelf: '책 고르는 중', libseat: '독서 중', board: '화이트보드 낙서', coffee: '커피 내리는 중', sofa: '소파에서 쉬는 중', bench: '벤치에 앉아 있음', plants: '화분 돌보기', window: '창밖 구경', stroll: '정원 산책', meet: '회의실에 앉아 있음', statusboard: '현황판 확인' })[a.spot.tags[0]] || '생활 중' : '쉬는 중';
-  const room = a.away ? '바깥' : (ROOMS[grid[Math.round((a.y - 14) / T)]?.[Math.round((a.x - 8) / T)]?.room] || '-');
-  document.getElementById('card').innerHTML = '';
-  for (const [k, v] of [['역할', a.role], ['성격', a.trait], ['관심사', a.likes.join(' · ')], ['지금', doing], ['있는 곳', room]]) {
-    const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; document.getElementById('card').append(dt, dd);
+  document.getElementById('follow').textContent = follow ? `따라가는 중: ${a.name}` : `둘러보는 중: ${FLOOR_NAME[viewFloor]}`;
+  const sch = schedule(a);
+  const doing = a.away ? (sch === 'home' ? '퇴근함(집)' : '바깥 산책 중') : a.real ? `실제 기록(시험): ${a.real.text}` : a.pose === 'sleep' ? '자는 중' : a.route.length ? '이동 중'
+    : a.act && a.act.talk ? '대화 중' : sch === 'overtime' && a.spot && a.spot.tags.includes('desk') ? '야근 중' : a.spot ? DOING[a.spot.tags[0]] || '생활 중' : '쉬는 중';
+  const [pxx, pyy] = agentPos(a);
+  const room = a.away ? '바깥' : `${FLOOR_NAME[floorOf(pxx)]} · ${ROOMS[grid[Math.round((pyy - 14) / T)]?.[Math.round((pxx - 8) / T)]?.room] || '복도'}`;
+  const card = document.getElementById('card'); card.innerHTML = '';
+  for (const [k, v] of [['이름', `${a.name} (${a.role})`], ['성격', a.trait], ['관심사', a.likes.join(' · ')], ['생활', a.home === 'dorm' ? '숙소 생활' : '출퇴근'], ['지금', doing], ['있는 곳', room]]) {
+    const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; card.append(dt, dd);
   }
   const nd = document.getElementById('needs'); nd.innerHTML = '';
   for (const [k, lab, col] of [['energy', '기운', '#e9c46a'], ['social', '사교', '#f4a261'], ['fun', '재미', '#8ab17d'], ['coffee', '커피', '#a47551']]) {
@@ -1074,10 +1196,15 @@ function panel() {
   const t = document.getElementById('rel'); t.innerHTML = '';
   for (const b of PEOPLE.filter(b => b.id !== a.id).sort((x, y) => R(a.id, y.id).aff - R(a.id, x.id).aff)) {
     const r = R(a.id, b.id), tr = document.createElement('tr');
-    tr.innerHTML = `<td></td><td></td>`; tr.firstChild.textContent = `${b.name} · ${relLabel(r)}${r.couple ? ' 💕' : ''}`; tr.lastChild.textContent = `${'♥'.repeat(Math.round(r.aff / 20))}${'♡'.repeat(5 - Math.round(r.aff / 20))} ${Math.round(r.aff)}`;
+    tr.innerHTML = `<td></td><td></td>`; tr.firstChild.textContent = `${a.name} → ${b.name} · ${relLabel(r)}${r.couple ? ' 💕' : ''}`; tr.lastChild.textContent = `${'♥'.repeat(Math.round(r.aff / 20))}${'♡'.repeat(5 - Math.round(r.aff / 20))} ${Math.round(r.aff)}`;
     t.append(tr);
   }
 }
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  document.querySelectorAll('.grid > .panel').forEach(p => p.classList.toggle('on', p.id === 'tab-' + b.dataset.tab));
+});
+document.getElementById('info').onclick = e => { const l = document.getElementById('legend'); l.hidden = !l.hidden; e.currentTarget.setAttribute('aria-expanded', String(!l.hidden)); };
 
 // ---------------------------------------------------------------- 입력
 let drag = null, dragged = false;
@@ -1085,86 +1212,94 @@ cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, c
 addEventListener('pointermove', e => { if (!drag) return; const k = cv.getBoundingClientRect().width / (VW * T), dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   if (!dragged && Math.hypot(dx, dy) < 8) return; dragged = true; follow = false; cam.tx = drag.cx - dx / k; cam.ty = drag.cy - dy / k; });
 addEventListener('pointerup', () => { drag = null; });
-cv.style.touchAction = 'none';
 cv.addEventListener('click', e => { if (dragged) { dragged = false; return; }
   const rect = cv.getBoundingClientRect(), x = (e.clientX - rect.left) / rect.width * VW * T + cam.x, y = (e.clientY - rect.top) / rect.height * VH * T + cam.y;
-  const hit = agents.filter(a => !a.away).map(a => ({ a, d: Math.hypot(a.x - x, a.y - 14 - y) })).sort((p, q) => p.d - q.d)[0];
-  if (hit && hit.d < 22) { selected = hit.a.id; follow = true; panel(); if (!hit.a.bubble && !hit.a.real) { hit.a.speak(say(hit.a, 'hello')); hit.a.hop = 0.8; } }
+  const hit = agents.filter(a => !a.away && floorOf(agentPos(a)[0]) === viewFloor).map(a => { const [ax, ay] = agentPos(a); return { a, d: Math.hypot(ax - x, ay - 14 - y) }; }).sort((p, q) => p.d - q.d)[0];
+  if (hit && hit.d < 22) { selected = hit.a.id; follow = true; panel(); if (!hit.a.bubble && !hit.a.real && hit.a.pose !== 'sleep') { hit.a.speak(say(hit.a, 'hello')); hit.a.hop = 0.8; } }
 });
-function setSpeed(v) { speed = v; for (const [id, s] of [['sp1', 1], ['sp30', 30], ['sp240', 240]]) document.getElementById(id).setAttribute('aria-pressed', String(s === v)); }
-document.getElementById('sp1').onclick = () => { setSpeed(1); worldMs = Date.now(); };
-document.getElementById('sp30').onclick = () => setSpeed(30);
-document.getElementById('sp240').onclick = () => setSpeed(240);
-document.getElementById('pause').onclick = e => { paused = !paused; e.target.setAttribute('aria-pressed', String(paused)); e.target.textContent = paused ? '계속' : '멈춤'; };
+const SPEEDS = [1, 30, 240];
+document.getElementById('speed').onclick = e => { const i = (SPEEDS.indexOf(speed) + 1) % SPEEDS.length; speed = SPEEDS[i]; if (speed === 1) worldMs = Date.now();
+  e.currentTarget.textContent = speed === 1 ? '실시간' : speed + '배'; e.currentTarget.setAttribute('aria-pressed', String(speed > 1)); };
+document.getElementById('pause').onclick = e => { paused = !paused; e.currentTarget.setAttribute('aria-pressed', String(paused)); e.currentTarget.textContent = paused ? '계속' : '멈춤'; };
 document.getElementById('replay').onclick = replay;
 document.getElementById('ot').onclick = e => { const on = !activeTask.size; activeTask.clear(); if (on) { activeTask.add('writer'); activeTask.add('research'); }
-  e.target.setAttribute('aria-pressed', String(on)); log(on ? '시험 시뮬레이션: 솔·미나에게 진행 중 과제가 있다고 가정(야근 장면). 실제 과제 아님.' : '야근 시뮬레이션 끔.', 'real'); };
+  e.currentTarget.setAttribute('aria-pressed', String(on)); log(on ? '시험 시뮬레이션: 솔·미나에게 진행 중 과제가 있다고 가정(야근 장면). 실제 과제 아님.' : '야근 시뮬레이션 끔.', 'real'); };
+for (const f of [1, 2]) document.getElementById('f' + f).onclick = () => { follow = false; viewFloor = f; cam.tx = (f === 2 ? F2X * T : 0); cam.ty = 0; panel(); };
 
 // ---------------------------------------------------------------- 카메라·미니맵
+let zoomVW = null;   // 사용자가 정한 가로 칸 수(없으면 화면에 맞춤)
 function fit() {
-  const w = document.getElementById('stage').clientWidth;
-  VW = w >= 1000 ? 21 : w >= 760 ? 18 : w >= 520 ? 15 : 11;
-  VH = w < 520 ? 12 : Math.round(VW * 0.6);   // 휴대폰 세로 화면은 거의 정사각형으로 크게
+  const st = document.getElementById('stage'), w = st.clientWidth, sm = w < 640;
+  const base = sm ? 10 : FW;
+  VW = clamp(zoomVW ?? base, 7, FW);
+  if (sm) { const targetH = Math.min(innerHeight * 0.58, w * 1.45); VH = clamp(Math.round(VW * targetH / w), 7, FH); }
+  else if (matchMedia('(max-height: 520px) and (orientation: landscape)').matches) { VH = clamp(Math.round(VW * (innerHeight - 40) / w), 7, FH); }
+  else VH = clamp(Math.round(VW * FH / FW), 7, FH);
   cv.width = VW * T * S; cv.height = VH * T * S; cx.imageSmoothingEnabled = false;
-  cx.font = `${9 * S}px ${getComputedStyle(document.body).fontFamily}`;
 }
 addEventListener('resize', () => fit());
+document.getElementById('zin').onclick = () => { zoomVW = clamp((zoomVW ?? VW) - 3, 7, FW); fit(); };
+document.getElementById('zout').onclick = () => { zoomVW = clamp((zoomVW ?? VW) + 3, 7, FW); fit(); };
 function camTarget() {
   if (follow) { const a = agents.find(a => a.id === selected); if (a) {
-    if (a.away) { cam.tx = 14 * T + 8 - VW * T / 2; cam.ty = 29 * T - VH * T / 2; }
-    else { const b = a.pose === 'sleep' && beds.find(b => b.owner === a.id); cam.tx = (b ? b.c * T : a.x) - VW * T / 2; cam.ty = (b ? b.r * T : a.y - 16) - VH * T / 2; } } }
-  cam.tx = clamp(cam.tx, 0, COLS * T - VW * T); cam.ty = clamp(cam.ty, 0, ROWS * T - VH * T);
+    if (a.away) { viewFloor = 1; cam.tx = ENTRANCE.c * T + 8 - VW * T / 2; cam.ty = ENTRANCE.r * T - VH * T / 2; }
+    else { const [px, py] = agentPos(a); viewFloor = floorOf(px); cam.tx = px - VW * T / 2; cam.ty = py - 16 - VH * T / 2; } } }
+  const fx0 = viewFloor === 2 ? F2X * T : 0;
+  cam.tx = VW >= FW ? fx0 : clamp(cam.tx, fx0, fx0 + FW * T - VW * T);
+  cam.ty = VH >= FH ? 0 : clamp(cam.ty, 0, FH * T - VH * T);
 }
-function moveCam(dt) { camTarget(); const k = RM ? 1 : Math.min(1, dt * 3.5); cam.x += (cam.tx - cam.x) * k; cam.y += (cam.ty - cam.y) * k; }
-const ROOM_VIEW = { 1: [1, 2, 14, 12], 2: [16, 2, 30, 12], 3: [32, 2, 46, 12], 4: [1, 14, 30, 28], 5: [32, 14, 46, 20], 6: [32, 22, 46, 28] };
-function lookAt(cx0, cy0) { follow = false; cam.tx = cx0 - VW * T / 2; cam.ty = cy0 - VH * T / 2; }
-document.querySelectorAll('.rooms button').forEach(b => b.onclick = () => { const [c0, r0, c1, r1] = ROOM_VIEW[b.dataset.room]; lookAt((c0 + c1 + 1) / 2 * T, (r0 + r1 + 1) / 2 * T); });
+function moveCam(dt) { const before = floorOf(cam.x + 1); camTarget();
+  if (floorOf(cam.tx + 1) !== before) { cam.x = cam.tx; cam.y = cam.ty; return; } // 층이 바뀌면 바로 넘어감
+  const k = RM ? 1 : Math.min(1, dt * 3.5); cam.x += (cam.tx - cam.x) * k; cam.y += (cam.ty - cam.y) * k; }
 const mini = document.getElementById('mini'), mx = mini.getContext('2d');
 function drawMini() {
   if (!staticLayer || mini.offsetParent === null) return;
   const k = mini.width / (COLS * T); mx.imageSmoothingEnabled = false;
   mx.drawImage(staticLayer, 0, 0, mini.width, mini.height);
-  for (const a of agents) { if (a.away) continue; const b = a.pose === 'sleep' && beds.find(b => b.owner === a.id);
-    mx.fillStyle = a.color; mx.fillRect(((b ? b.c * T + 8 : a.x) * k) - 3, ((b ? b.r * T + 8 : a.y - 8) * k) - 3, 6, 6);
-    if (a.id === selected) { mx.strokeStyle = '#ffe08a'; mx.lineWidth = 2; mx.strokeRect(((b ? b.c * T + 8 : a.x) * k) - 5, ((b ? b.r * T + 8 : a.y - 8) * k) - 5, 10, 10); } }
+  for (const a of agents) { if (a.away) continue; const [px, py] = agentPos(a);
+    mx.fillStyle = a.color; mx.fillRect(px * k - 3, (py - 8) * k - 3, 6, 6);
+    if (a.id === selected) { mx.strokeStyle = '#ffe08a'; mx.lineWidth = 2; mx.strokeRect(px * k - 5, (py - 8) * k - 5, 10, 10); } }
   for (const c of cats) { mx.fillStyle = '#f0a050'; mx.fillRect(c.x * k - 1.5, (c.y - 6) * k - 1.5, 3, 3); }
   mx.strokeStyle = 'rgba(255,255,255,.9)'; mx.lineWidth = 1.5; mx.strokeRect(cam.x * k, cam.y * k, VW * T * k, VH * T * k);
 }
-mini.addEventListener('click', e => { const r = mini.getBoundingClientRect(); lookAt((e.clientX - r.left) / r.width * COLS * T, (e.clientY - r.top) / r.height * ROWS * T); });
+mini.addEventListener('click', e => { const r = mini.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * COLS * T, y = (e.clientY - r.top) / r.height * ROWS * T;
+  follow = false; viewFloor = floorOf(x); cam.tx = x - VW * T / 2; cam.ty = y - VH * T / 2; });
 
 // ---------------------------------------------------------------- 시작
 const clockEl = document.getElementById('clock');
-let last = performance.now(), acc = 0, panelT = 0;
+let last = performance.now(), panelT = 0, stageVisible = true;
+try { new IntersectionObserver(es => { stageVisible = es[0].isIntersecting; }).observe(document.getElementById('stage')); } catch (e) { /* 지원 안 하면 항상 그림 */ }
 function loop(now) {
-  let dt = Math.min(0.1, (now - last) / 1000); last = now;
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (!paused) {
     worldMs += dt * 1000 * speed;
     const sdt = dt * simRate();
     for (const a of agents) { a.update(sdt); if (a.hop) a.hop = Math.max(0, a.hop - dt); if (a.blush) a.blush = Math.max(0, a.blush - dt); }
     for (const c of cats) c.update(sdt);
-    moveCam(dt);
-    render(dt);
-    drawMini();
   }
-  overlay();
+  // 화면 밖이거나 다른 탭이면 그리기를 쉬어 배터리 절약(생활 시간은 계속 흐름)
+  if (stageVisible && !document.hidden) { if (!paused) { moveCam(dt); render(dt); drawMini(); } overlay(); }
   if ((panelT -= dt) <= 0) { panel(); panelT = 0.5; const t = kst(worldMs); const di = dayInfo(), hn = hourNow(), mode = di.weekend ? '주말' : hn >= 9 && hn < 18 ? '연구 시간' : hn >= 18 && hn < 23 ? '퇴근 후' : hn >= 23 || hn < 6 ? '한밤' : '출근 전';
-    clockEl.textContent = `${'일월화수목금토'[di.dow]} ${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')} · ${mode}${speed > 1 ? ' · ' + speed + '배' : ''}`; }
+    const hm = `${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}`; clockEl.textContent = small() ? `${'일월화수목금토'[di.dow]} ${hm}` : `${'일월화수목금토'[di.dow]} ${hm} · ${mode}`; clockEl.title = mode; }
   requestAnimationFrame(loop);
 }
 Promise.all(Object.keys(ASSETS).map(load)).then(async () => {
   try { await document.fonts.load('16px "Gowun Dodum"'); } catch (e) { /* 기본 글꼴 */ }
   relInit(); buildMap(); staticLayer = buildStatic(); fit();
+  if (small()) { document.getElementById('legend').hidden = true; document.getElementById('info').setAttribute('aria-expanded', 'false'); }
   agents = PEOPLE.map((p, i) => new Agent(p, i));
   // 지금 시간대에 맞게 시작 자세
-  for (const a of agents) if (schedule(a) === 'home') { a.away = true; a.x = 14 * T + 8; a.y = 29 * T + 14; }
+  for (const a of agents) if (schedule(a) === 'home') { a.away = true; a.x = ENTRANCE.c * T + 8; a.y = ENTRANCE.r * T + 14; }
   for (const a of agents) if (schedule(a) === 'sleep') { const sp = spots.find(s => s.id === 'bed-' + a.id); a.x = (sp.c + 1) * T + 8; a.y = (sp.r + 1) * T + 14; a.take(sp); a.pose = 'sleep'; }
-  cats = [new Cat('pet_gitcat', 40, 8, '까망이'), new Cat('pet_claudio', 36, 17, '귤이')];
+  cats = [new Cat('pet_gitcat', F2X + 14, 9, '까망이'), new Cat('pet_claudio', 12, 12, '귤이')];
+  // 처음엔 깨어 있는 사람을 따라감
+  const awake = agents.find(a => !a.away && a.pose !== 'sleep'); if (awake) selected = awake.id;
   camTarget(); cam.x = cam.tx; cam.y = cam.ty;
   log('생활관 문이 열렸어요. 장면은 연출이고, 관계는 이 브라우저에 저장됩니다.');
   const couples = Object.entries(rel).filter(([, r]) => r.couple).map(([k]) => k.split('|').map(id => byId[id].name).join('·'));
   if (couples.length) log(`지난번에 이어서: ${couples.join(', ')} 커플 💕`, 'love');
   panel(); requestAnimationFrame(loop);
-  window.__labState = () => agents.map(a => ({ id: a.id, pose: a.pose, spot: a.spot && a.spot.id, route: a.route.length, away: a.away, act: !!a.act, sch: schedule(a), pc: pcOn(a.id) }));
+  window.__labState = () => agents.map(a => ({ id: a.id, pose: a.pose, spot: a.spot && a.spot.id, route: a.route.length, away: a.away, act: !!a.act, sch: schedule(a), pc: pcOn(a.id), floor: floorOf(agentPos(a)[0]) }));
 });
 })();
 </script>
