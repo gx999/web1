@@ -24,6 +24,20 @@ def _err_text(status: int, body: dict) -> str:
     return f"{status} {json.dumps(body)[:200]}"
 
 
+def extract_text(data: dict) -> str:
+    """Responses API 원 응답에서 텍스트 추출. `output_text`는 SDK 편의 필드라 원 JSON에는 없을 수 있다
+    (실제 첫 호출에서 확인: 텍스트가 output[].content[].text 에만 있었음)."""
+    if data.get("output_text"):
+        return data["output_text"]
+    parts = []
+    for item in data.get("output") or []:
+        if item.get("type") == "message":
+            for c in item.get("content") or []:
+                if c.get("type") in ("output_text", "text") and c.get("text"):
+                    parts.append(c["text"])
+    return "\n".join(parts)
+
+
 def call_model(budget: Budget, transport: Transport, call_id: str, model: str, prompt: str,
                est_input_tokens: int, url: str = "https://api.openai.com/v1/responses") -> dict[str, Any]:
     """한 번의 호출. 반환: {ok, text, usage, cost, error, blocked}"""
@@ -46,8 +60,9 @@ def call_model(budget: Budget, transport: Transport, call_id: str, model: str, p
             u = {"input_tokens": usage.get("input_tokens"), "output_tokens": usage.get("output_tokens")}
             u = u if None not in u.values() else None
             cost = budget.settle(call_id, model, u)
-            text = data.get("output_text") or ""
-            return {"ok": True, "text": text, "usage": u, "cost": cost}
+            text = extract_text(data)
+            return {"ok": True, "text": text, "usage": u, "cost": cost, "response_id": data.get("id"),
+                    "status": data.get("status"), "incomplete": (data.get("incomplete_details") or {}).get("reason")}
         last_err = _err_text(status, data)
         if any(k in last_err.lower() for k in STOP_ERRORS) or status in (401, 403):
             break                                  # 비용·권한 문제: 재시도 금지

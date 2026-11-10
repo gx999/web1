@@ -97,3 +97,15 @@ def test_state_persists_across_restart(tmp_path):
     b.kill("수동 정지")
     b2 = mk(tmp_path)                                            # 관리자 재시작 모사
     assert b2.report()["spent_usd"] > 0 and b2.report()["killed"] == "수동 정지"
+
+
+def test_extracts_text_from_raw_responses_shape(tmp_path):
+    from kernel.openai_worker import extract_text
+    raw = {"id": "resp_x", "status": "completed", "output": [
+        {"type": "reasoning", "summary": []},
+        {"type": "message", "content": [{"type": "output_text", "text": "요약 1"}, {"type": "output_text", "text": "요약 2"}]}],
+        "usage": {"input_tokens": 10, "output_tokens": 5}}
+    assert extract_text(raw) == "요약 1\n요약 2"
+    b = mk(tmp_path)
+    r = call_model(b, FakeHTTP((200, raw)), "c1", "test-model", "x", 10)
+    assert r["text"] == "요약 1\n요약 2" and r["response_id"] == "resp_x"
