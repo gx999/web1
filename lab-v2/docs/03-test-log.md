@@ -14,7 +14,10 @@
 | T-C 수집 | `session_01UTSPTdbSot…`(container_01RTtfMv…) 03:54:26Z 시작 | S1 law.go.kr 200·**1,279B 껍데기(본문 아님)**, S2 대법원 **access_restricted**(502, 3회), S3 KISA 200·87,289B → 일부 출처 실패에도 나머지 저장, `done` |
 | T-D 선행연구 시도1 | `session_01UTSPTaYC1U…`(container_01WwqXSE…) 같은 시각 시작 | OpenAlex `Rate limit exceeded`(외부 IP 공유 한도) → 값 추측 없이 중단, API 키(이메일 외부 전송) 미발급 |
 | T-D 시도2 | `session_01UTSPTc2kGH…`(대체 출처 Crossref) | 체크포인트 3/6 전송 후 **관리자가 강제 중단** → 세션 IDLE 확인 |
-| T-D 시도3 | `session_01UTSPTcKYoW…` | 체크포인트 3/6부터 재개(진행 중 — 결과는 아래에 추가) |
+| T-D 시도3 | `session_01UTSPTcKYoW…` 04:12:13Z | 재조회로 1~3번 DOI가 체크포인트와 같음을 먼저 확인 → 4~6번만 처리 → 04:12:51Z `done` 6/6 |
+
+- **중단은 즉시가 아니었다** [실제]: 시도2 중단 요청(04:02:56Z 직후) 뒤 04:03:06Z에 4번 체크포인트가 도착. 원장은 중단된 실행의 늦은 기록을 채택하지 않아 4번은 시도3에서 다시 처리됨(서지 조회라 무해, 실제 중복 실행 1건). 쓰기 부작용이 있는 단계는 '중단 확인(IDLE) 후 재배정'과 멱등 키가 필수임을 확인.
+- 품질 메모: 3·4번 동일 제목·다른 DOI(SSRN 중복 등록) → 검토 단계 확인 대상. 질의어가 영어라 국내 문헌 후보 0건 — KCI·RISS 검색 경로가 별도로 필요.
 
 - 작업자 → 관리자 `send_message`는 **승인 프롬프트 없이 전달**됨(이벤트 기반 연결 경로로 사용 가능).
 - 세션 메타데이터: `rate_limit_info.status=allowed`, `five_hour`, `isUsingOverage=false`. `usage.cost_usd`(예: 시도2 0.168)는 API 환산 표시로 보이며 **실제 청구액으로 해석하지 않음**(구독 경로, 잔량 미확인).
