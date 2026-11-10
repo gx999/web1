@@ -123,6 +123,19 @@ class Budget:
         self._save()
         return cost
 
+    def reconcile(self, call_id: str, model: str, usage: dict[str, int], note: str = "") -> float:
+        """정산 뒤 늦게 확인된 실제 사용량으로 정정. 원래 금액·근거는 남기고 차액만 반영."""
+        c = next((c for c in self.s["calls"] if c["id"] == call_id), None)
+        if c is None:
+            raise BudgetBlocked(f"정산 기록 없음: {call_id}")
+        new = self._cost(model, usage["input_tokens"], usage["output_tokens"])
+        c.setdefault("corrections", []).append({"at": self.now(), "from": c["cost"], "from_basis": c["basis"],
+                                                "to": new, "note": note[:200]})
+        self.s["spent_usd"] = round(self.s["spent_usd"] - c["cost"] + new, 6)
+        c["cost"], c["basis"] = new, "usage_reconciled"
+        self._save()
+        return new
+
     def kill(self, reason: str) -> None:
         self.s["killed"] = reason
         self._save()
