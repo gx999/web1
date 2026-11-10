@@ -217,7 +217,9 @@ function put(k, c, r, opt = {}) {
 }
 function spot(id, c, r, face, pose, tags, opt = {}) { spots.push({ id, c, r, face, pose, tags, owner: opt.owner || null, room: grid[r][c].room, busy: null, dy: opt.dy || 0, dx: opt.dx || 0 }); }
 
-const DESKS = [ ['lead', 3, 17], ['research', 10, 17], ['writer', 17, 17], ['reviewer', 6, 23], ['experiment', 13, 23] ];
+const DESKS = [ ['lead', 25, 22], ['research', 3, 17], ['writer', 10, 17], ['reviewer', 17, 17], ['experiment', 6, 23] ];
+// 팀장실: 연구실 오른쪽에 낮은 칸막이(나무+간유리)로 구분, 입구는 왼쪽 칸막이 가운데
+const LEAD_ROOM = { c0: 23, r0: 20, c1: 29, r1: 27, doorRows: [23, 24] };
 const beds = [];
 function buildMap() {
   // 연구실: 책상 다섯(사람은 책상 뒤에 앉아 화면 쪽을 봄)
@@ -230,6 +232,11 @@ function buildMap() {
     spot('desk-' + owner, c + 1, r + 2, 'up', 'type', ['desk'], { owner, dy: -9 });
     grid[r + 2][c + 1].block = false;
   }
+  { const L0 = LEAD_ROOM; for (let c = L0.c0; c <= L0.c1; c++) grid[L0.r0][c].block = true;
+    for (let r = L0.r0; r <= L0.r1; r++) if (!L0.doorRows.includes(r)) grid[r][L0.c0].block = true;
+    put('DOUBLE_BOOKSHELF', 27, 21); put('PLANT', 24, 21); put('COFFEE', 25, 22, { z: 22 * T + 40, dy: -2 });
+    put('WOODEN_CHAIR_FRONT', 25, 25, { z: 26 * T + 10 }); put('WOODEN_CHAIR_FRONT', 27, 25, { z: 26 * T + 10 });
+    spot('lead-visit-a', 25, 26, 'up', 'stand', ['leadvisit']); spot('lead-visit-b', 27, 26, 'up', 'stand', ['leadvisit']); }
   put('WHITEBOARD', 24, 14, { wall: true, z: 14 * T });
   spot('status-board', 24, 16, 'up', 'stand', ['statusboard']);
   put('BOOKSHELF', 27, 14, { wall: true, z: 14 * T });
@@ -336,6 +343,8 @@ const L = {
   leave: ['퇴근! 내일 봐요~', '먼저 들어갈게요, 수고했어요!', '오늘 저녁은 떡볶이다!', '집에 가는 길 노을 예쁘겠다.'],
   work: ['집중 모드 🔥', '타닥타닥…', '메모 정리하는 중.', '음… 이 표 예쁘게 다듬어야지.', '오늘 할 일 체크 ✔', '잠깐, 이 문장 좋은데?'],
   overtime: ['야근 중… 조금만 더!', '마지막 한 단락만!', '커피 수혈이 필요해…', '오늘 안에 끝내자 💪', '창밖이 깜깜해졌네…'],
+  report: ['팀장님, 잠깐 시간 괜찮으세요?', '오늘 할 일 정리해 왔어요!', '이거 한번 봐 주실래요?', '팀장님 커피 드실래요?'],
+  leadReply: ['그래요, 천천히 말해 봐요.', '좋네요. 무리하지 말고요.', '고마워요. 같이 보죠.', '오, 잘 정리했네요.'],
   cheer: ['야근 응원 간식 왔어요 🍙', '무리하지 말고 이거 먹어요!', '따뜻한 차 한 잔 하고 해요.'],
 };
 // 캐릭터별 말투(같은 상황이라도 성격이 묻어나게) — v1 LIFE_PERSONAS 설정을 따름
@@ -638,6 +647,7 @@ function think(a) {
   const worker = agents.find(b => b !== a && !b.away && schedule(b) === 'overtime' && b.spot && b.spot.tags.includes('desk'));
   if (worker && sch === 'free' && Math.random() < 0.18) return doGift(a, worker);
   // 연구 시간: 대부분 책상(연출), 사이사이 휴식
+  if (sch === 'work' && a.id !== 'lead' && Math.random() < 0.08) return doReport(a);
   if (sch === 'work' && Math.random() < 0.62) return doDesk(a, true);
   const n = a.need, f = a.fav;
   const opts = [
@@ -689,6 +699,15 @@ function doWindow(a) {
 function doDesk(a, work) {
   const sp = spots.find(s => s.id === 'desk-' + a.id);
   a.gotoSpot(sp, ok => { if (!ok) return; if (work && Math.random() < 0.35) a.speak(say(a, 'work'), 3.5); stay(a, work ? rnd(30, 55) : rnd(14, 26), { end: x => { x.need.energy -= 4; x.need.fun -= work ? 6 : 0; } }); if (!work) log(`${a.name}, 자기 책상에서 ${pick(a.likes)} 정리(개인 시간).`); });
+}
+function doReport(a) {
+  const lead = agents.find(x => x.id === 'lead');
+  if (!lead || lead.away || lead.busy || !(lead.spot && lead.spot.id === 'desk-lead')) return doDesk(a, true);
+  const sp = freeSpot('leadvisit', a); if (!sp) return doDesk(a, true);
+  lead.act = { t: 25, talk: true, lock: true };
+  a.gotoSpot(sp, ok => { if (!ok) { lead.act = null; return; }
+    talk(a, lead, [[0, say(a, 'report')], [1, say(lead, 'leadReply')], [0, '네! 🙇'], [1, '', () => emit('spark', lead.x, lead.y - 34, 2)]], () => { lead.pose = 'type'; const r = R(a.id, 'lead'); r.aff = clamp(r.aff + 2, 0, 100); relSave(); });
+    log(`${a.name}, 팀장실에 들러 지피와 이야기.`); });
 }
 function doNap(a) {
   const sp = freeSpot('sofa', a); if (!sp) return doWindow(a);
@@ -910,6 +929,12 @@ function buildStatic() {
   rug(3 * T, 6 * T + 8, 8 * T, 5 * T, '#c7c8ad', '#eeead7');        // 자료실 독서
   rug(20 * T, 5 * T + 8, 8 * T, 6 * T, '#7d947f', '#d1d2ad');      // 회의실
   rug(2 * T, 18 * T + 8, 20 * T, 7 * T, '#b8b396', '#e0d5b7');     // 연구실 책상 구역
+  rug(24 * T + 4, 21 * T + 4, 5 * T + 8, 6 * T + 8, '#c9a96e', '#f1dfb4');  // 팀장실
+  { const L0 = LEAD_ROOM, part = (c, r) => { const x = c * T, y = r * T; g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x + 2, y + 13, T, 3);
+      g.fillStyle = '#8b6a4a'; g.fillRect(x, y + 6, T, 9); g.fillStyle = '#d7e6ec'; g.fillRect(x + 1, y, T - 2, 7); g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(x + 3, y + 1, 4, 1);
+      g.fillStyle = '#6d5139'; g.fillRect(x, y + 6, T, 1); g.fillRect(x, y + 14, T, 1); };
+    for (let c = L0.c0; c <= L0.c1; c++) part(c, L0.r0);
+    for (let r = L0.r0 + 1; r <= L0.r1; r++) if (!L0.doorRows.includes(r)) part(L0.c0, r); }
   rug(35 * T, 25 * T, 8 * T, 3 * T, '#a9a1c9', '#e2dcef');          // 숙소
   // 정원 징검돌 길
   for (const [c, r] of [[39, 14], [38, 15], [37, 16], [36, 17], [35, 18], [35, 19], [40, 16], [41, 16], [43, 16], [44, 17]]) {
@@ -1004,7 +1029,7 @@ function render(dt) {
   drawParts(dt);
   // 방 이름
   cx.font = `${9 * S}px ${getComputedStyle(document.body).fontFamily}`; cx.fillStyle = 'rgba(60,48,36,.55)';
-  for (const [n, c, r] of [['자료실', 2, 12.6], ['회의실', 17, 12.6], ['카페 라운지', 33, 12.6], ['연구실', 2, 28.6], ['옥상 정원', 33, 20.6], ['숙소', 33, 28.6]]) cx.fillText(n, c * T * S, r * T * S);
+  for (const [n, c, r] of [['자료실', 2, 12.6], ['회의실', 17, 12.6], ['카페 라운지', 33, 12.6], ['연구실', 2, 28.6], ['팀장실 · 지피', 24.2, 20.75], ['옥상 정원', 33, 20.6], ['숙소', 33, 28.6]]) cx.fillText(n, c * T * S, r * T * S);
 }
 
 // ---------------------------------------------------------------- 말풍선·이름표(HTML)
