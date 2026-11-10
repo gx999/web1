@@ -78,3 +78,4 @@
 ## 진행 기록
 - 2026-11-10: 사용자 확인 — Claude 사용 크레딧 꺼짐.
 - 2026-11-10: 비용 차단 코드 `kernel/budget.py`·`kernel/openai_worker.py` 작성, 모의시험 8개 통과(실제 API 호출 0회). 요금표는 비어 있음 → 공식 요금 확인 전 모든 OpenAI 호출 차단.
+- 2026-11-10: OpenAI Agents API 시범 AP1 2회(test=true). 구성: environment none·tools []·하위 에이전트 꺼짐·service_tier default. 초안 gpt-6.1-terra, 검토 gpt-6-sol(별도 세션), 수정은 초안 세션 이어쓰기. 3단계 모두 completed, 턴당 약 6초, 턴당 입력 약 1만 토큰(하네스 기본 지시 포함). 내부 집계 합계 $0.0947(캐시 입력도 정가 계산). 발견: ① 완료 직후 turn usage가 null → 재조회로 수정, 1회차는 정정 기록(reconcile) ② law.go.kr 연속 요청 중 연결 실패(개인정보 보호법 조문) → 같은 실행 안 응답 재사용, 실패는 access_restricted로 기록·우회 없음 ③ 자료 누락 시 두 모델 모두 지어내지 않고 '비교 불가'로 처리. 기록: 비공개 저장소 tests/agents_pilot/.
