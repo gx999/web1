@@ -64,3 +64,23 @@ def test_program_error_is_transient_not_access_restricted():
         raise UnicodeEncodeError("ascii", "법", 0, 1, "x")
     a = law_go_kr.fetch_article("개인정보보호법", "제34조", boom)
     assert a.status == "transient_failed"
+
+
+from collectors import kci  # noqa: E402
+
+KCI_ROW = '''<td class="checkpoint"><input/></td><td>1 .</td><td><div class="s-state-type-ico type-ico1 ico">KCI 등재</div>
+<a href="/kciportal/ci/sereArticleSearch/ciSereArtiView.kci?sereArticleSearchBean.artiId=ART003316221"
+ onclick="x" class="subject">개인정보 유출사고의 형사처벌과 행정처분에 대한 연구</a>
+<ul class="nopm floats subject-info"><li><a href="/kciportal/po/citationindex/poCretDetail.kci?x">홍길동</a></li>
+<li><a href="/kciportal/po/search/poInsiSearSoceView.kci?x">한국학회</a></li>
+<li><a href="/kciportal/ci/seriesSearch/ciSereInfoView.kci?x">학회지</a></li><li>2026.03</li></ul></td>'''
+KCI_OFFTOPIC = KCI_ROW.replace("ART003316221", "ART003383027").replace(
+    "개인정보 유출사고의 형사처벌과 행정처분에 대한 연구", "Collagen 유도의 혈소판 항혈전 효과")
+
+
+def test_kci_parse_and_relevance_guard():
+    good, bad = kci.parse((KCI_ROW + KCI_OFFTOPIC).encode(), "개인정보 유출")
+    assert good.arti_id == "ART003316221" and good.authors == ["홍길동"] and good.journal == "학회지"
+    assert good.issue_date == "2026.03" and good.kci_listed and good.relevant
+    assert not bad.relevant           # 검색어를 무시한 결과는 선행연구로 쓰지 않음
+    assert good.status == bad.status == "search_only"
