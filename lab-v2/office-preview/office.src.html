@@ -56,6 +56,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
 .ticker b { font-family: var(--font-display); font-weight: 400; margin-right: 6px }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center }
 .follow { font-family: var(--font-display); font-size: 15px; margin-right: 4px }
+.evt { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft) }
+.evt select { font: inherit; font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; min-height: 36px }
 .tabs { display: none; gap: 6px }
 .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1.2fr); gap: 10px }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0 }
@@ -136,6 +138,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
     <span class="follow" id="follow">따라가는 중: 미나</span>
     <button id="replay">실제 기록 재생 · T24-1</button>
     <button id="ot" aria-pressed="false">야근 장면 보기</button>
+    <label class="evt"><span>이벤트 미리보기</span>
+      <select id="evt"><option value="">선택…</option><option value="rain">비 오는 날 켜기/끄기</option><option value="bday">생일 파티 (솔, 15시로 이동)</option>
+        <option value="game">금요일 보드게임 밤 (19시로 이동)</option><option value="lunch">수요일 배달 점심 (12시로 이동)</option><option value="cat">고양이 장난 지금</option><option value="now">지금 시각으로 돌아가기</option></select></label>
   </div>
   <div class="tabs" role="tablist" aria-label="정보">
     <button role="tab" data-tab="card" aria-selected="true">연구원</button><button role="tab" data-tab="rel" aria-selected="false">관계</button><button role="tab" data-tab="log" aria-selected="false">일지</button>
@@ -307,6 +312,7 @@ function buildMap() {
     put('WOODEN_CHAIR_SIDE', c, r - 1, { flip: f === 'left', z: r * T + 1 });
     spot('dine-' + i, c, r, f, 'sit', ['meet', 'dine'], { dy: -6 });
   });
+  prop('cake', X(5), 10, { z: 12 * T + 40 }); prop('delivery', X(4), 10, { z: 12 * T + 41 });
   prop('fridge', X(9), 8, { block: true }); prop('bowl', X(9), 14); prop('cushion', X(10), 14);
   // 라운지
   put('SOFA_FRONT', X(12), 7); put('SOFA_FRONT', X(15), 7); put('COFFEE_TABLE', X(13), 4);
@@ -386,7 +392,6 @@ const L = {
   gift: ['이거 마셔요, 따뜻해요.', '수고했어요, 커피 한 잔!', '당 충전하세요 🍫', '이거 좋아하죠? 사 왔어요.'],
   thanks: ['고마워요!', '헤헤, 잘 마실게요.', '감동이에요…', '역시 최고!', '마침 마시고 싶었어요!'],
   hello: ['안녕하세요!', '네?', '헤헤', '오늘도 좋은 하루!', '(손 흔들기)', '앗, 들켰다!', '저 불렀어요?', '간지러워요~'],
-  rain: ['비 오는 소리 좋다…', '우산 챙겼어요?'],
   arrive: ['출근했어요! 좋은 아침~', '지하철에서 고양이 영상 봤어요 ㅎㅎ', '오늘도 힘내 봐요!', '출근 도장 쾅!', '빵 사 왔어요, 하나씩 드세요!'],
   visit: ['주말인데 놀러 왔어요~', '집에 있으니 심심해서요 ㅎㅎ', '고양이들 보고 싶어서 왔어요!'],
   leave: ['퇴근! 내일 봐요~', '먼저 들어갈게요, 수고했어요!', '오늘 저녁은 떡볶이다!', '집에 가는 길 노을 예쁘겠다.'],
@@ -394,6 +399,9 @@ const L = {
   overtime: ['야근 중… 조금만 더!', '마지막 한 단락만!', '커피 수혈이 필요해…', '오늘 안에 끝내자 💪', '창밖이 깜깜해졌네…'],
   report: ['팀장님, 잠깐 시간 괜찮으세요?', '오늘 할 일 정리해 왔어요!', '이거 한번 봐 주실래요?', '팀장님 커피 드실래요?'],
   leadReply: ['그래요, 천천히 말해 봐요.', '좋네요. 무리하지 말고요.', '고마워요. 같이 보죠.', '오, 잘 정리했네요.'],
+  rain: ['비 오는 소리 좋다…', '우산 챙겼어요?', '오늘은 창가가 명당이에요.', '빗소리 들으면서 차 한잔 ☔', '정원 화분들 물 안 줘도 되겠다!'],
+  lunchWed: ['배달 왔어요! 짜장면이다~', '탕수육은 부먹? 찍먹?', '수요일은 배달 먹는 날!', '단무지 누가 더 먹을래요?'],
+  boardgame: ['주사위 굴린다~!', '앗, 내 말 잡혔어!', '이번엔 내가 이긴다!', '규칙 한 번만 더 설명해 줘요 ㅎㅎ', '두근두근…'],
   cheer: ['야근 응원 간식 왔어요 🍙', '무리하지 말고 이거 먹어요!', '따뜻한 차 한 잔 하고 해요.'],
 };
 // 캐릭터별 말투(같은 상황이라도 성격이 묻어나게) — v1 LIFE_PERSONAS 설정을 따름
@@ -506,16 +514,40 @@ const PIX = {
   drop: ['.x.', 'xxx', 'xxx', '.x.'],
   spark: ['.x.', 'xxx', '.x.'],
   steam: ['x', '.', 'x'],
+  leaf: ['xx', 'x.'], snow: ['x'], petal: ['xx'], rain: ['x', 'x', 'x'], confetti: ['xx'],
 };
 function emit(kind, x, y, n = 1, color) {
   if (RM && kind !== 'z') n = Math.min(n, 1);
   const col = color || { heart: '#ef6f6c', note: '#5b6dc8', z: '#7aa0d8', drop: '#5fb1e8', spark: '#ffd166', steam: '#ffffff' }[kind];
   for (let i = 0; i < n; i++) parts.push({ kind, x: x + rnd(-6, 6), y: y + rnd(-4, 2), vx: rnd(-6, 6), vy: rnd(-22, -12), life: rnd(1.2, 2.2), t: 0, col });
 }
+// 머리 위 감정 아이콘(작은 흰 말풍선 안 7×7 픽셀 그림)
+const EMO = {
+  heart: ['#ef6f6c', ['.xx.xx.', 'xxxxxxx', 'xxxxxxx', '.xxxxx.', '..xxx..', '...x...', '.......']],
+  ex: ['#e76f51', ['...x...', '...x...', '...x...', '...x...', '.......', '...x...', '.......']],
+  q: ['#5b6dc8', ['..xxx..', '.x...x.', '.....x.', '...xx..', '...x...', '.......', '...x...']],
+  note: ['#5b6dc8', ['...xxx.', '...x.x.', '...x.x.', '.xxx.x.', 'xxxx.x.', '.xx.xx.', '....xx.']],
+  sweat: ['#5fb1e8', ['...x...', '..xxx..', '.xxxxx.', '.xxxxx.', '..xxx..', '.......', '.......']],
+  anger: ['#e63946', ['.x...x.', 'xx...xx', '.......', '.......', '.......', 'xx...xx', '.x...x.']],
+  idea: ['#f4b400', ['..xxx..', '.xxxxx.', '.xxxxx.', '..xxx..', '..xxx..', '...x...', '..xxx..']],
+  sleep: ['#7aa0d8', ['xxxxx..', '...x...', '..x....', 'xxxxx..', '....xxx', '.....x.', '....xxx']],
+  spark: ['#f4b400', ['...x...', '..xxx..', 'xxxxxxx', '..xxx..', '...x...', '.......', '.......']],
+};
+function drawEmote(kind, x, y) {
+  const e = EMO[kind]; if (!e) return; const pop = 0;
+  cx.fillStyle = '#3b3128'; cx.fillRect((x - 1) * S, (y - 1 + pop) * S, 11 * S, 10 * S);
+  cx.fillStyle = '#fffdf7'; cx.fillRect(x * S, (y + pop) * S, 9 * S, 8 * S); cx.fillRect((x + 3) * S, (y + 8 + pop) * S, 2 * S, 2 * S);
+  cx.fillStyle = e[0]; e[1].forEach((row, ry) => [...row].forEach((ch, rx) => { if (ch === 'x') cx.fillRect((x + 1 + rx) * S, (y + 1 + ry + pop) * S, S, S); }));
+}
+function drawHat(x, y, col) { cx.fillStyle = col; cx.fillRect((x + 2) * S, (y + 0) * S, 2 * S, S); cx.fillRect((x + 1) * S, (y + 1) * S, 4 * S, 2 * S); cx.fillRect(x * S, (y + 3) * S, 6 * S, 2 * S);
+  cx.fillStyle = '#fff3a8'; cx.fillRect((x + 2) * S, (y - 1) * S, 2 * S, S); cx.fillRect((x + 1) * S, (y + 3) * S, S, S); cx.fillRect((x + 4) * S, (y + 2) * S, S, S); }
+function drawUmbrella(x, y) { cx.fillStyle = '#6fa8dc'; cx.fillRect((x + 1) * S, (y + 2) * S, 14 * S, 3 * S); cx.fillRect((x + 3) * S, (y + 1) * S, 10 * S, S); cx.fillRect((x + 6) * S, y * S, 4 * S, S);
+  cx.fillStyle = '#4f86b8'; cx.fillRect((x + 1) * S, (y + 4) * S, 14 * S, S); cx.fillStyle = '#3b3128'; cx.fillRect((x + 8) * S, (y + 5) * S, S, 6 * S); }
+function fall(kind, x, y, col, vy = 14, life = 6) { if (parts.length > 260) return; parts.push({ kind, x, y, vx: rnd(-4, 4), vy, life, t: 0, col, fall: true, sway: rnd(0, 6) }); }
 function drawParts(dt) {
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i]; p.t += dt; if (p.t > p.life) { parts.splice(i, 1); continue; }
-    p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.98;
+    p.x += p.vx * dt + (p.sway ? Math.sin(p.t * 3 + p.sway) * 0.4 : 0); p.y += p.vy * dt; if (!p.fall) p.vx *= 0.98;
     const a = 1 - p.t / p.life; cx.globalAlpha = clamp(a * 1.4, 0, 1); cx.fillStyle = p.col;
     PIX[p.kind].forEach((row, ry) => [...row].forEach((ch, rx) => { if (ch === 'x') cx.fillRect(Math.round(p.x + rx) * S, Math.round(p.y + ry) * S, S, S); }));
   }
@@ -533,7 +565,12 @@ class Agent {
     this.bubble = null; this.spot = null; this.real = null; this.away = false; this.i = i; this.last = '';
   }
   get busy() { return !!(this.act && (this.act.lock || this.real)); }
-  speak(text, secs = 4.5, real = false) { this.bubble = { text, t: secs, real }; }
+  speak(text, secs = 4.5, real = false) { this.bubble = { text, t: secs, real };
+    if (!text || this.emo && this.emo.t > 0.5) return; // 말에 따라 감정 아이콘 자동
+    const k = /[♥💕]/.test(text) ? 'heart' : /\?$/.test(text) ? 'q' : /♪|노래/.test(text) ? 'note' : /…|ㅠ|헉/.test(text) ? 'sweat' : /!$/.test(text) ? 'ex' : null;
+    if (k) this.emote(k); }
+  emote(kind, secs = 2.2) { this.emo = { kind, t: secs }; }
+  act1(pose, secs) { this.gesture = { pose, t: secs }; }   // 짧은 동작(기지개·손 흔들기·꾸벅)
   go(c, r, then) {
     const pth = path({ c: Math.round((this.x - 8) / T), r: Math.round((this.y - 14) / T) }, { c, r });
     if (!pth) { then && then(false); return false; }
@@ -547,6 +584,11 @@ class Agent {
   update(dt) {
     this.anim += dt;
     if (this.bubble && (this.bubble.t -= dt) <= 0) this.bubble = null;
+    if (this.emo && (this.emo.t -= dt) <= 0) this.emo = null;
+    if (this.gesture && (this.gesture.t -= dt) <= 0) this.gesture = null;
+    if (this.rush) this.rush = Math.max(0, this.rush - dt);
+    if (this.umbrella) this.umbrella = Math.max(0, this.umbrella - dt);
+    if (this.followT) this.followStep(dt);
     // 욕구는 서서히 변함(잠·커피·대화·놀이로 회복)
     const n = this.need, sleeping = this.pose === 'sleep';
     n.energy = clamp(n.energy + (sleeping ? 4.2 : -0.11) * dt, 0, 100);
@@ -554,7 +596,7 @@ class Agent {
     n.fun = clamp(n.fun - 0.12 * dt, 0, 100);
     n.coffee = clamp(n.coffee - 0.1 * dt, 0, 100);
     if (this.route.length) {
-      const [c, r] = this.route[0], tx = c * T + 8, ty = r * T + 14, sp = (this.couplewalk ? 30 : 34) * simRate();
+      const [c, r] = this.route[0], tx = c * T + 8, ty = r * T + 14, sp = (this.couplewalk ? 30 : 34) * simRate() * (this.rush ? 1.8 : 1);
       if (Math.abs(tx - this.x) > 3 * T) { emit('spark', this.x, this.y - 20, 2); this.x = tx; this.y = ty; this.route.shift(); emit('spark', tx, ty - 20, 2); if (!this.route.length) { this.pose = 'stand'; const f = this.onArrive; this.onArrive = null; f && f(true); } return; }
       const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy);
       if (Math.abs(dx) > Math.abs(dy)) this.face = dx > 0 ? 'right' : 'left'; else if (d > 0.1) this.face = dy > 0 ? 'down' : 'up';
@@ -573,9 +615,23 @@ class Agent {
     if ((this.cool -= dt) > 0 || this.real) return;
     think(this);
   }
+  followStep(dt) { // 연인이 나란히 걷기: 앞사람 옆 칸으로 계속 따라감
+    const f = this.followT; f.t -= dt; f.k = (f.k || 0) - dt;
+    if (f.t <= 0 || f.who.away || this.act && this.act.talk) { this.followT = null; this.couplewalk = false; return; }
+    if (f.k > 0) return; f.k = 0.7;
+    const lc = Math.round((f.who.x - 8) / T), lr = Math.round((f.who.y - 14) / T);
+    const tgt = [[lc - 1, lr], [lc + 1, lr], [lc, lr + 1], [lc, lr - 1]].find(t => passable(...t));
+    if (tgt && Math.hypot(this.x - (tgt[0] * T + 8), this.y - (tgt[1] * T + 14)) > 4) { const pth = path({ c: Math.round((this.x - 8) / T), r: Math.round((this.y - 14) / T) }, { c: tgt[0], r: tgt[1] });
+      if (pth && pth.length) { this.route = pth; this.pose = 'walk'; this.couplewalk = true; } }
+    if (Math.random() < 0.15) emit('heart', (this.x + f.who.x) / 2, Math.min(this.y, f.who.y) - 38, 1);
+  }
   frame() {
     const rows = { down: 0, up: 1, right: 2, left: 2 };
     let col = 1;
+    if (this.gesture && this.pose !== 'walk') { const g = this.gesture.pose, ph = Math.floor(this.anim * 6) % 2;
+      if (g === 'wave') return { col: 3 + ph, row: 0, flip: false };
+      if (g === 'stretch') return { col: ph ? 5 : 1, row: Math.floor(this.anim * 2) % 2 ? 0 : 1, flip: false };
+      if (g === 'cheer') return { col: ph ? 0 : 2, row: 0, flip: false }; }
     if (this.pose === 'walk') col = [0, 1, 2, 1][Math.floor(this.anim * 7) % 4];
     else if (this.pose === 'type') col = 3 + (Math.floor(this.anim * 4) % 2);
     else if (this.pose === 'read') col = 5 + (Math.floor(this.anim * 1.2) % 2);
@@ -590,7 +646,8 @@ class Agent {
     const bob = this.pose === 'stand' && !RM ? Math.round(Math.sin(this.anim * 2 + this.i) * 0.4) : 0;
     const hop = this.hop ? Math.round(-Math.abs(Math.sin(this.hop * 9)) * 3) : 0;
     const dx = (this.spot ? this.spot.dx : 0), dy = (this.spot ? this.spot.dy : 0);
-    const x = Math.round(this.x - 8 + dx), y = Math.round(this.y - 30 + dy + bob + hop);
+    const bow = this.gesture && this.gesture.pose === 'bow' ? 2 : 0;
+    const x = Math.round(this.x - 8 + dx), y = Math.round(this.y - 30 + dy + bob + hop + bow);
     // 그림자
     cx.fillStyle = 'rgba(0,0,0,.18)'; cx.fillRect((x + 3) * S, (y + 29) * S, 10 * S, 2 * S);
     cx.save();
@@ -598,6 +655,10 @@ class Agent {
     else cx.drawImage(im, col * 16, row * 32, 16, 32, x * S, y * S, 16 * S, 32 * S);
     cx.restore();
     if (this.blush) { cx.fillStyle = 'rgba(239,111,108,.55)'; cx.fillRect((x + 4) * S, (y + 10) * S, 2 * S, S); cx.fillRect((x + 10) * S, (y + 10) * S, 2 * S, S); }
+    if (party.on && floorOf(this.x) === 2) drawHat(x + 5, y - 3, this.color);              // 생일 파티 고깔모자
+    if (this.umbrella && this.pose === 'walk') drawUmbrella(x, y - 6);                       // 비 오는 날 우산
+    if (this.rush && Math.random() < 0.08) emit('drop', this.x + 6, this.y - 30, 1, '#8fc8f0'); // 뛰어오는 땀
+    if (this.emo) drawEmote(this.emo.kind, x + 9, y - 13);
   }
 }
 
@@ -612,6 +673,7 @@ class Cat {
     if (this.route.length) {
       const [c, r] = this.route[0], tx = c * T + 8, ty = r * T + 14, sp = 26 * simRate();
       if (Math.abs(tx - this.x) > 3 * T) { this.x = tx; this.y = ty; this.route.shift(); return; }
+      if (this.route.length === 1 && this.prank && Math.hypot(tx - this.x, ty - this.y) <= sp * dt) { const f = this.prank; this.prank = null; setTimeout(f, 50); }
       const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy);
       if (Math.abs(dx) > Math.abs(dy)) this.face = dx > 0 ? 'right' : 'left'; else if (d > .1) this.face = dy > 0 ? 'down' : 'up';
       if (d <= sp * dt) { this.x = tx; this.y = ty; this.route.shift(); if (!this.route.length) { this.state = Math.random() < .5 ? 'sit' : 'loaf'; this.t = rnd(6, 16); } }
@@ -648,29 +710,43 @@ function freeSpot(tag, a, near) {
 }
 // 출퇴근·근무·야근: 출퇴근(지피·솔·클로)은 정해진 시각에 정문으로 출근·퇴근, 기숙(미나·코디)은 숙소에서 생활.
 // 평일 09~18시는 연구 시간(책상 위주, 사이사이 휴식), 진행 중인 과제가 있으면 퇴근 시각이 지나도 야근.
-const activeTask = new Set();   // 진행 중 과제 담당(미리보기: 실제 기록 재생·야근 보기 버튼으로만 켜짐)
+const activeTask = new Set();
+// 생활 이벤트 ─ 생일(가상 설정), 날씨(날짜로 정해지는 비), 계절, 금요일 보드게임 밤, 수요일 배달 점심
+const BDAY = { lead: '04-03', research: '02-14', writer: '11-11', reviewer: '09-21', experiment: '07-07' };
+let forceRain = false, forceBday = null;
+const party = { on: false };
+function md() { const d = new Date(worldMs + 9 * 3600e3); return String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0'); }
+function birthdayPerson() { if (forceBday) return forceBday; const m = md(); return Object.keys(BDAY).find(k => BDAY[k] === m) || null; }
+function raining() { if (forceRain) return true; const m = md(); let h = 7; for (const ch of m) h = (h * 31 + ch.charCodeAt(0)) % 997; return h % 10 < 3; }
+function season() { const mo = new Date(worldMs + 9 * 3600e3).getUTCMonth() + 1; return mo >= 3 && mo <= 5 ? 'spring' : mo >= 6 && mo <= 8 ? 'summer' : mo >= 9 && mo <= 11 ? 'autumn' : 'winter'; }
+const SEASON_NAME = { spring: '봄', summer: '여름', autumn: '가을', winter: '겨울' };   // 진행 중 과제 담당(미리보기: 실제 기록 재생·야근 보기 버튼으로만 켜짐)
 function dayInfo() { const d = new Date(worldMs + 9 * 3600e3), dow = d.getUTCDay(); return { dow, weekend: dow === 0 || dow === 6 }; }
 function schedule(a) {
   const h = hourNow(), hh = h < 4 ? h + 24 : h, { weekend } = dayInfo(), busy = activeTask.has(a.id);
   if (a.home === 'dorm') { if (hh >= a.sleep || hh < a.wake) return busy && hh < 26 ? 'overtime' : 'sleep'; }
   else {
-    const inHours = weekend ? h >= 13 && h < 19 : h >= a.arrive && h < a.leave;
+    const fri = dayInfo().dow === 5, inHours = weekend ? h >= 13 && h < 19 : h >= a.arrive && h < (fri ? 21 : a.leave);
     if (!inHours) return busy && hh >= 8 && hh < 25 ? 'overtime' : 'home';
   }
   if (h >= 12 && h < 13) return 'lunch';
-  if (h >= 15 && h < 15.5) return 'tea';
+  if (h >= 15 && h < 15.5) return birthdayPerson() ? 'party' : 'tea';
+  if (dayInfo().dow === 5 && h >= 19 && h < 21) return 'gamenight';
   if (!weekend && h >= 9 && h < 18) return busy ? 'overtime' : 'work';
   if (busy) return 'overtime';
   return 'free';
 }
 function arrive(a) {
   a.away = false; a.release(); a.x = ENTRANCE.c * T + 8; a.y = ENTRANCE.r * T + 14; a.pose = 'stand';
-  a.speak(say(a, dayInfo().weekend ? 'visit' : 'arrive'), 4); log(`${a.name} ${dayInfo().weekend ? '주말에 놀러 옴' : '출근'}.`);
+  const late = !dayInfo().weekend && hourNow() > (a.arrive || 9) + 0.25;
+  if (raining()) a.umbrella = 8;
+  if (late) { a.rush = 6; a.speak(pick(['헉헉, 지각할 뻔!', '버스 놓쳤어요… 뛰어왔어요!', '세이프…?']), 4); a.emote('sweat', 3); }
+  else { a.speak(say(a, dayInfo().weekend ? 'visit' : 'arrive'), 4); a.act1('wave', 1.5); }
+  log(`${a.name} ${dayInfo().weekend ? '주말에 놀러 옴' : late ? '출근(아슬아슬)' : '출근'}${raining() ? ' · 우산' : ''}.`);
   const sp = spots.find(s => s.id === 'desk-' + a.id); a.gotoSpot(sp, ok => { if (ok) stay(a, rnd(8, 14), { end: x => { x.need.coffee -= 10; } }); });
 }
 function leave(a) {
   if (activeTask.has(a.id)) return;
-  a.speak(say(a, 'leave'), 4); log(`${a.name} 퇴근.`);
+  a.speak(say(a, 'leave'), 4); a.act1('wave', 1.5); if (raining()) a.umbrella = 8; log(`${a.name} 퇴근.`);
   a.go(ENTRANCE.c, ENTRANCE.r, ok => { if (!ok) return; a.away = true; a.release(); stay(a, 20); });
 }
 function doOvertime(a) {
@@ -685,9 +761,11 @@ function think(a) {
   if (sch !== 'overtime') a._otLogged = false;
   if (sch === 'overtime') return doOvertime(a);
   if (sch === 'sleep') return doSleep(a);
-  if (a.pose === 'sleep') { a.pose = 'stand'; a.release(); a.speak(say(a, 'greetMorning')); log(`${a.name} 기상. "${a.bubble.text}"`); emit('spark', a.x, a.y - 30, 2); a.hop = 1; a.cool = 2; return; }
-  if (sch === 'lunch') return doGather(a, 'dine', 'lunch', '점심');
+  if (a.pose === 'sleep') { a.pose = 'stand'; a.release(); a.speak(say(a, 'greetMorning')); log(`${a.name} 기상. "${a.bubble.text}"`); a.act1('stretch', 1.8); a.emote('spark'); a.hop = 1; a.cool = 2; return; }
+  if (sch === 'lunch') return doGather(a, 'dine', dayInfo().dow === 3 ? 'lunchWed' : 'lunch', dayInfo().dow === 3 ? '배달 점심' : '점심');
   if (sch === 'tea') return doGather(a, 'sofa', 'tea', '티타임');
+  if (sch === 'party') return doParty(a);
+  if (sch === 'gamenight') return doGameNight(a);
   // 연인과 함께하기(저녁일수록 자주)
   const partner = coupleOf(a), h = hourNow();
   if (partner && !partner.busy && !partner.route.length && Math.random() < (h >= 17 ? 0.35 : 0.15)) return doDate(a, partner);
@@ -716,7 +794,8 @@ function think(a) {
     ['gift', crushOf(a) || partner ? 16 : 3],
   ].filter(o => o[0] !== a.last).map(([k, v]) => [k, Math.max(1, v + rnd(0, 24))]);
   opts.sort((x, y) => y[1] - x[1]);
-  const choice = opts[Math.random() < 0.75 ? 0 : 1][0];
+  let choice = opts[Math.random() < 0.75 ? 0 : 1][0];
+  if (raining() && (choice === 'stroll' || choice === 'plants')) { choice = 'window'; if (Math.random() < 0.5) a.speak(say(a, 'rain'), 3.5); }
   a.last = choice;
   ({ coffee: doCoffee, chat: doChat, read: doRead, board: doBoard, plants: doPlants, stroll: doStroll, cat: doCat, nap: doNap,
      window: doWindow, desk: doDesk, outwalk: doOutwalk, gift: doGift })[choice](a);
@@ -732,7 +811,7 @@ function doRead(a) {
 }
 function doBoard(a) {
   const sp = freeSpot('board', a); if (!sp) return doWindow(a);
-  a.gotoSpot(sp, ok => { if (!ok) return; a.speak(say(a, 'board')); stay(a, rnd(8, 14), { tick: (x, dt) => { x.pose = Math.floor(x.anim * 2) % 2 ? 'type' : 'stand'; }, end: x => { x.pose = 'stand'; x.need.fun = clamp(x.need.fun + 30, 0, 100); } }); log(`${a.name}, 회의실 화이트보드에 낙서 중.`); });
+  a.gotoSpot(sp, ok => { if (!ok) return; a.speak(say(a, 'board')); a.emote('idea', 2.5); stay(a, rnd(8, 14), { tick: (x, dt) => { x.pose = Math.floor(x.anim * 2) % 2 ? 'type' : 'stand'; }, end: x => { x.pose = 'stand'; x.need.fun = clamp(x.need.fun + 30, 0, 100); } }); log(`${a.name}, 회의실 화이트보드에 낙서 중.`); });
 }
 function doPlants(a) {
   const sp = freeSpot('plants', a); if (!sp) return doStroll(a);
@@ -749,7 +828,7 @@ function doWindow(a) {
 }
 function doDesk(a, work) {
   const sp = spots.find(s => s.id === 'desk-' + a.id);
-  a.gotoSpot(sp, ok => { if (!ok) return; if (work && Math.random() < 0.35) a.speak(say(a, 'work'), 3.5); stay(a, work ? rnd(30, 55) : rnd(14, 26), { end: x => { x.need.energy -= 4; x.need.fun -= work ? 6 : 0; } }); if (!work) log(`${a.name}, 자기 책상에서 ${pick(a.likes)} 정리(개인 시간).`); });
+  a.gotoSpot(sp, ok => { if (!ok) return; if (work && Math.random() < 0.35) a.speak(say(a, 'work'), 3.5); stay(a, work ? rnd(30, 55) : rnd(14, 26), { end: x => { x.need.energy -= 4; x.need.fun -= work ? 6 : 0; if (Math.random() < 0.3) { x.act1('stretch', 1.6); x.speak(pick(['으아~ 기지개!', '어깨 뭉쳤다…', '잠깐 스트레칭!']), 3); } } }); if (!work) log(`${a.name}, 자기 책상에서 ${pick(a.likes)} 정리(개인 시간).`); });
 }
 function doReport(a) {
   const lead = agents.find(x => x.id === 'lead');
@@ -757,8 +836,39 @@ function doReport(a) {
   const sp = freeSpot('leadvisit', a); if (!sp) return doDesk(a, true);
   lead.act = { t: 25, talk: true, lock: true };
   a.gotoSpot(sp, ok => { if (!ok) { lead.act = null; return; }
-    talk(a, lead, [[0, say(a, 'report')], [1, say(lead, 'leadReply')], [0, '네! 🙇'], [1, '', () => emit('spark', lead.x, lead.y - 34, 2)]], () => { lead.pose = 'type'; const r = R(a.id, 'lead'); r.aff = clamp(r.aff + 2, 0, 100); relSave(); });
+    a.act1('bow', 1.2);
+    talk(a, lead, [[0, say(a, 'report')], [1, say(lead, 'leadReply')], [0, '네! 🙇', () => a.act1('bow', 1)], [1, '', () => emit('spark', lead.x, lead.y - 34, 2)]], () => { lead.pose = 'type'; const r = R(a.id, 'lead'); r.aff = clamp(r.aff + 2, 0, 100); relSave(); });
     log(`${a.name}, 팀장실에 들러 지피와 이야기.`); });
+}
+function doParty(a) {
+  const star = birthdayPerson(), who = byId[star];
+  const sp = freeSpot('dine', a) || freeSpot('game', a) || freeSpot('sofa', a); if (!sp) return doWindow(a);
+  if (!party.on) { party.on = true; log(`🎂 ${who.name} 생일 파티(가상 설정 생일 ${BDAY[star] || '오늘'}).`, 'love'); }
+  a.gotoSpot(sp, ok => { if (!ok) return;
+    a.speak(a.id === star ? pick(['다들 고마워요… 감동이에요 ㅠㅠ', '케이크 제가 자를게요!', '소원 빌었어요! 비밀!']) : pick(['생일 축하해요! 🎂', `${who.name}, 생일 축하해~ ♪`, '후~ 하고 불어요!', '선물은 이따 줄게요!', '생일 축하합니다~ ♪']), 4);
+    stay(a, rnd(14, 20), { tick: (x, dt) => { if (Math.random() < dt * 2) for (let k = 0; k < 2; k++) fall('confetti', x.x + rnd(-20, 20), x.y - 50, pick(['#ef6f6c', '#ffd166', '#8cc184', '#5b6dc8', '#f49ac1']), 18, 3); } });
+  });
+}
+function doGameNight(a) {
+  const sp = freeSpot('game', a) || freeSpot('sofa', a) || freeSpot('dine', a); if (!sp) return doWindow(a);
+  a.gotoSpot(sp, ok => { if (!ok) return; a.speak(say(a, 'boardgame'), 3.5);
+    stay(a, rnd(12, 18), { end: x => { const r = Math.random(); if (r < 0.25) { x.speak(pick(['이겼다!! ✨', '역전승~!']), 3); x.hop = 1; x.emote('spark'); const o = others(x).find(b => b.spot && ['game', 'sofa'].includes(b.spot.tags[0])); if (o) highFive(x, o); }
+      else if (r < 0.4) { x.speak(pick(['또 졌어… 한 판 더!', '뾰로통…']), 3); x.emote('anger'); } } });
+  });
+  if (!game.logged) { game.logged = true; log('🎲 금요일 보드게임 밤!', 'love'); setTimeout(() => game.logged = false, 60000); }
+}
+const game = { logged: false };
+function catPrank() {
+  const cat = cats.find(c => floorOf(c.x) === 1) || cats[0];
+  const worker = agents.find(a => !a.away && a.spot && a.spot.tags.includes('desk') && floorOf(a.x) === 1); if (!worker) return false;
+  const d = DESKS.find(d => d[0] === worker.id); const tgt = [d[1] + 3, d[2] + 1];
+  if (!passable(...tgt)) return false;
+  const pth = path({ c: Math.round((cat.x - 8) / T), r: Math.round((cat.y - 14) / T) }, { c: tgt[0], r: tgt[1] }); if (!pth) return false;
+  cat.route = pth; cat.state = 'walk'; cat.t = 99; cat.prank = () => {
+    emit('drop', d[1] * T + 40, d[2] * T + 4, 4, '#a46a3c'); worker.emote('ex', 2.5); worker.speak(pick([`앗! ${cat.name} 커피가…!`, '으앗, 키보드!!', `${cat.name}야~ 거기 아니야!`]), 3.5);
+    setTimeout(() => { worker.speak(pick(['…귀여우니까 봐준다.', '괜찮아, 휴지 있어 ㅎㅎ']), 3.5); worker.emote('heart'); emit('heart', cat.x, cat.y - 22, 2, '#f49ac1'); cat.t = 8; cat.state = 'sit'; }, 2600);
+    log(`${cat.name}, ${worker.name} 책상의 커피를 엎음.`); };
+  return true;
 }
 function doNap(a) {
   const sp = freeSpot('sofa', a); if (!sp) return doWindow(a);
@@ -825,13 +935,16 @@ function doChat(a) {
     const [k1, k2] = topicFor(a, b), r = R(a.id, b.id);
     const room = ROOMS[grid[Math.round((a.y - 14) / T)]?.[Math.round((a.x - 8) / T)]?.room] || '';
     let lines;
-    if (Math.random() < 0.55) lines = sceneFor(a, b, room, r).turns.map(([w, t]) => [w, t]);
+    const bd = birthdayPerson();
+    if (bd && (a.id === bd || b.id === bd) && Math.random() < 0.6) lines = a.id === bd ? [[1, '생일 축하해요! 🎂'], [0, '헤헤, 고마워요!'], [1, '이따 3시에 파티해요 ♪']] : [[0, '생일 축하해요! 🎂'], [1, '기억해 줬어요? 감동…'], [0, '당연하죠! 이따 케이크 ♪']];
+    else if (Math.random() < 0.55) lines = sceneFor(a, b, room, r).turns.map(([w, t]) => [w, t]);
     else { lines = [[0, say(a, k1)], [1, say(b, k2)]]; if (Math.random() < 0.6) lines.push([0, say(a, 'laugh'), () => emit('note', a.x, a.y - 34, 1)]); }
     if (r.couple) lines.push([1, '', () => emit('heart', (a.x + b.x) / 2, Math.min(a.y, b.y) - 36, 2)]);
     if (r.aff >= 85 && r.romance && !r.couple) lines.push([1, say(b, 'crush'), () => { b.blush = 6; emit('heart', b.x, b.y - 34, 1); }]);
     talk(a, b, lines, () => {
       const gain = rnd(2, 5) * (1 + (a.fav.chat + b.fav.chat - 2) * 0.5); r.aff = clamp(r.aff + gain, 0, 100); r.talks++; relSave();
       a.need.social = b.need.social = 100; a.need.fun += 6; b.need.fun += 6;
+      if (r.aff >= 60 && Math.random() < 0.2) highFive(a, b);
       if (r.couple) emit('heart', (a.x + b.x) / 2, Math.min(a.y, b.y) - 36, 3);
     });
     log(`${J(a.name, '과', '와')} ${b.name}의 수다 (${relLabel(r)}).`);
@@ -854,9 +967,18 @@ function doGift(a, target) {
     });
   } }); });
 }
+function highFive(a, b) { a.face = b.x > a.x ? 'right' : 'left'; b.face = a.x > b.x ? 'right' : 'left'; a.hop = b.hop = 0.8; a.act1('cheer', 1); b.act1('cheer', 1);
+  a.speak('짝! ✋', 2); b.speak('짝!', 2); emit('spark', (a.x + b.x) / 2, Math.min(a.y, b.y) - 30, 4); }
+function doCoupleWalk(a, b) {
+  const sp = raining() ? freeSpot('window', a) : freeSpot('stroll', a); if (!sp) return doWindow(a);
+  b.act = null; b.route = []; b.followT = { who: a, t: 30 };
+  a.couplewalk = true; a.gotoSpot(sp, ok => { a.couplewalk = false; if (!ok) return; a.speak(say(a, 'couple'), 3.5); stay(a, 6); });
+  log(`${J(a.name, '과', '와')} ${b.name}, 나란히 걷기.`, 'love');
+}
 function doDate(a, b) {
+  if (Math.random() < 0.45) return doCoupleWalk(a, b);
   // 정원 벤치에 나란히 앉기 또는 함께 산책
-  const benches = [['bench-a', 'bench-b'], ['bench-c', 'bench-d']].map(p => p.map(id => spots.find(s => s.id === id))).find(p => !p[0].busy && !p[1].busy);
+  const benches = (raining() ? [['sofa-b', 'sofa-c']] : [['bench-a', 'bench-b'], ['bench-c', 'bench-d']]).map(p => p.map(id => spots.find(s => s.id === id))).find(p => !p[0].busy && !p[1].busy);
   if (!benches) return doStroll(a);
   b.act = { t: 40, talk: true, lock: true };
   a.couplewalk = b.couplewalk = true;
@@ -913,7 +1035,7 @@ async function replay() {
       const doIt = () => {
         a.speak(step.text, step.secs + 1, true);
         log(`${a.name} · ${step.text} (기록 ${step.at})`, 'real');
-        if (step.cheer) { agents.forEach(x => { x.hop = 1.5; emit('spark', x.x, x.y - 34, 3); }); }
+        if (step.cheer) { agents.forEach(x => { x.hop = 1.5; x.emote('spark'); emit('spark', x.x, x.y - 34, 3); }); highFive(ag('writer'), ag('reviewer')); }
         setTimeout(res, step.secs * 1000 / Math.max(1, simRate() * 0.8));
       };
       if (step.go) { const sp = spots.find(s => s.id === step.go); sp.busy = null; a.gotoSpot(sp, () => { a.pose = step.pose || a.pose; doIt(); }); }
@@ -1049,6 +1171,10 @@ function drawProp(p) {
     case 'boardgame': px(x + 4, y + 2, 20, 12, '#f6e9d6'); for (let k = 0; k < 4; k++) px(x + 6 + k * 4, y + 4 + (k % 2) * 3, 3, 3, ['#ef6f6c', '#5b6dc8', '#ffd166', '#8cc184'][k]); break;
     case 'flowerbed': px(x, y + 6, 16, 9, '#8b6a4a'); for (let k = 0; k < 4; k++) { px(x + 2 + k * 4, y + 3, 1, 4, '#4f9a54'); px(x + 1 + k * 4, y + 1 + (k % 2), 3, 3, ['#ff8fab', '#ffd166', '#ffffff', '#c9b6ff'][k]); } break;
     case 'watering': px(x + 3, y + 8, 8, 6, '#6fa8dc'); px(x + 11, y + 8, 4, 1, '#6fa8dc'); px(x + 5, y + 6, 4, 2, '#6fa8dc'); break;
+    case 'cake': if (!party.on) break; px(x + 1, y + 6, 18, 8, '#fff3e6'); px(x + 1, y + 6, 18, 2, '#f49ac1'); px(x + 3, y + 9, 3, 2, '#ef6f6c'); px(x + 9, y + 9, 3, 2, '#ef6f6c'); px(x + 15, y + 9, 2, 2, '#ef6f6c');
+      for (let k = 0; k < 3; k++) { px(x + 4 + k * 5, y + 2, 1, 4, '#8fc8f0'); px(x + 4 + k * 5, y + (Math.floor(t * 8 + k) % 2 ? 0 : 1), 1, 2, '#ffb703'); } break;
+    case 'delivery': if (!(dayInfo().dow === 3 && hourNow() >= 12 && hourNow() < 13)) break; px(x + 2, y + 6, 10, 7, '#f7f1e6'); px(x + 2, y + 6, 10, 2, '#e63946'); px(x + 16, y + 7, 10, 6, '#f7f1e6'); px(x + 17, y + 8, 8, 3, '#3b2a1a'); px(x + 30, y + 8, 8, 5, '#ffd166');
+      if (Math.floor(t * 2) % 2) px(x + 20, y + 3, 1, 3, 'rgba(255,255,255,.7)'); break;
     case 'swing': { const sw = Math.sin(t * 1.6) * 1.5; px(x + 1, y - 10, 1, 24, '#5b4330'); px(x + 14, y - 10, 1, 24, '#5b4330'); px(x + 1, y - 10, 14, 2, '#5b4330'); px(x + 4 + sw, y + 4, 8, 3, '#c98a4b'); px(x + 5 + sw, y - 8, 1, 12, '#8b6a4a'); px(x + 10 + sw, y - 8, 1, 12, '#8b6a4a'); break; }
   }
 }
@@ -1065,6 +1191,8 @@ function drawWindows(h) {
     cx.fillStyle = '#6b5a45'; cx.fillRect(c0 * T * S, (1 * T + 2) * S, 24 * S, 12 * S);
     cx.fillStyle = sky; cx.fillRect((c0 * T + 1) * S, (1 * T + 3) * S, 22 * S, 10 * S);
     if (h > 20 || h < 5) { cx.fillStyle = '#fff6c9'; cx.fillRect((c0 * T + 5 + (c0 % 7)) * S, (1 * T + 5) * S, S, S); cx.fillRect((c0 * T + 15) * S, (1 * T + 9) * S, S, S); }
+    if (raining()) { cx.fillStyle = 'rgba(80,100,130,.45)'; cx.fillRect((c0 * T + 1) * S, (1 * T + 3) * S, 22 * S, 10 * S); cx.fillStyle = 'rgba(220,235,255,.8)'; const o = Math.floor(performance.now() / 90) % 5;
+      for (let k = 0; k < 5; k++) cx.fillRect((c0 * T + 2 + k * 4 + o % 3) * S, (1 * T + 3 + ((k * 3 + o) % 7)) * S, S, 2 * S); }
     cx.fillStyle = '#6b5a45'; cx.fillRect((c0 * T + 11) * S, (1 * T + 3) * S, 2 * S, 10 * S);
   }
 }
@@ -1126,6 +1254,17 @@ function render(dt) {
       const g2 = cx.createRadialGradient(gx - 12 * S, gy + 8 * S, 2, gx - 12 * S, gy + 8 * S, 36 * S); g2.addColorStop(0, 'rgba(255,190,110,.32)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); cx.fillStyle = g2; cx.fillRect(gx - 50 * S, gy - 30 * S, 80 * S, 80 * S); }
     cx.globalCompositeOperation = 'source-over'; }
   glows.length = 0;
+  // 날씨·계절: 정원에 비 / 낙엽·눈·꽃잎·여름 햇살
+  const gx0 = (F2X + 18) * T, gx1 = (F2X + 25) * T;
+  if (viewFloor === 2 && !RM) {
+    if (raining()) { for (let k = 0; k < 3; k++) fall('rain', rnd(gx0, gx1), rnd(1.5 * T, 3 * T), 'rgba(170,200,235,.85)', 120, 1.2); }
+    else { const se = season(); if (Math.random() < dt * 3) {
+      if (se === 'autumn') fall('leaf', rnd(gx0, gx1), 2 * T, pick(['#d9822b', '#c4512f', '#e9b949', '#a0522d']), 12, 9);
+      else if (se === 'winter') fall('snow', rnd(gx0, gx1), 2 * T, '#ffffff', 10, 10);
+      else if (se === 'spring') fall('petal', rnd(gx0, gx1), 2 * T, pick(['#ffc8dd', '#ffafcc', '#fff0f5']), 11, 9); } }
+  }
+  if (raining()) { cx.fillStyle = 'rgba(70,90,120,.10)'; cx.fillRect(cam.x * S, cam.y * S, cv.width, cv.height); }
+  else if (season() === 'summer' && dk === 0) { cx.fillStyle = 'rgba(255,230,150,.06)'; cx.fillRect(cam.x * S, cam.y * S, cv.width, cv.height); }
   drawParts(dt);
   // 방 이름
   cx.font = `${9 * S}px ${getComputedStyle(document.body).fontFamily}`; cx.fillStyle = 'rgba(60,48,36,.55)';
@@ -1186,7 +1325,7 @@ function panel() {
   const [pxx, pyy] = agentPos(a);
   const room = a.away ? '바깥' : `${FLOOR_NAME[floorOf(pxx)]} · ${ROOMS[grid[Math.round((pyy - 14) / T)]?.[Math.round((pxx - 8) / T)]?.room] || '복도'}`;
   const card = document.getElementById('card'); card.innerHTML = '';
-  for (const [k, v] of [['이름', `${a.name} (${a.role})`], ['성격', a.trait], ['관심사', a.likes.join(' · ')], ['생활', a.home === 'dorm' ? '숙소 생활' : '출퇴근'], ['지금', doing], ['있는 곳', room]]) {
+  for (const [k, v] of [['이름', `${a.name} (${a.role})`], ['성격', a.trait], ['관심사', a.likes.join(' · ')], ['생활', a.home === 'dorm' ? '숙소 생활' : '출퇴근'], ['생일', `${BDAY[a.id].replace('-', '월 ')}일 (가상 설정)${birthdayPerson() === a.id ? ' 🎂 오늘!' : ''}`], ['지금', doing], ['있는 곳', room]]) {
     const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; card.append(dt, dd);
   }
   const nd = document.getElementById('needs'); nd.innerHTML = '';
@@ -1224,6 +1363,19 @@ document.getElementById('pause').onclick = e => { paused = !paused; e.currentTar
 document.getElementById('replay').onclick = replay;
 document.getElementById('ot').onclick = e => { const on = !activeTask.size; activeTask.clear(); if (on) { activeTask.add('writer'); activeTask.add('research'); }
   e.currentTarget.setAttribute('aria-pressed', String(on)); log(on ? '시험 시뮬레이션: 솔·미나에게 진행 중 과제가 있다고 가정(야근 장면). 실제 과제 아님.' : '야근 시뮬레이션 끔.', 'real'); };
+function jumpTo(dow, hour) { // 미리보기용: 가까운 그 요일·시각으로 시계 이동(연출만, 기록과 무관)
+  const now = new Date(worldMs + 9 * 3600e3); let add = (dow - now.getUTCDay() + 7) % 7;
+  const base = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + add) - 9 * 3600e3; worldMs = base + hour * 3600e3;
+  for (const a of agents) { a.act = null; a.cool = rnd(0.2, 1.5); } }
+document.getElementById('evt').onchange = e => { const v = e.target.value; e.target.value = '';
+  const now = new Date(worldMs + 9 * 3600e3), today = now.getUTCDay();
+  if (v === 'rain') { forceRain = !forceRain; log(forceRain ? '미리보기: 비 오는 날.' : '미리보기: 비 그침.'); }
+  if (v === 'bday') { forceBday = 'writer'; jumpTo(today, 14.95); log('미리보기: 솔 생일 파티(15시).', 'love'); viewFloor = 2; selected = 'writer'; follow = true; }
+  if (v === 'game') { jumpTo(5, 18.95); log('미리보기: 금요일 보드게임 밤(19시).', 'love'); selected = 'experiment'; follow = true; }
+  if (v === 'lunch') { jumpTo(3, 11.97); log('미리보기: 수요일 배달 점심(12시).'); selected = 'research'; follow = true; }
+  if (v === 'cat') { if (!catPrank()) log('고양이 장난: 지금 1층 책상에 앉은 사람이 없어요.'); else { selected = agents.find(a => a.spot && a.spot.tags.includes('desk') && floorOf(a.x) === 1)?.id || selected; follow = true; } }
+  if (v === 'now') { worldMs = Date.now(); forceRain = false; forceBday = null; party.on = false; log('지금 시각으로 돌아옴.'); }
+  panel(); };
 for (const f of [1, 2]) document.getElementById('f' + f).onclick = () => { follow = false; viewFloor = f; cam.tx = (f === 2 ? F2X * T : 0); cam.ty = 0; panel(); };
 
 // ---------------------------------------------------------------- 카메라·미니맵
@@ -1276,11 +1428,14 @@ function loop(now) {
     const sdt = dt * simRate();
     for (const a of agents) { a.update(sdt); if (a.hop) a.hop = Math.max(0, a.hop - dt); if (a.blush) a.blush = Math.max(0, a.blush - dt); }
     for (const c of cats) c.update(sdt);
+    if (Math.random() < dt * 0.003 * speed ** 0.5) catPrank(); // 가끔 고양이 장난
   }
   // 화면 밖이거나 다른 탭이면 그리기를 쉬어 배터리 절약(생활 시간은 계속 흐름)
   if (stageVisible && !document.hidden) { if (!paused) { moveCam(dt); render(dt); drawMini(); } overlay(); }
   if ((panelT -= dt) <= 0) { panel(); panelT = 0.5; const t = kst(worldMs); const di = dayInfo(), hn = hourNow(), mode = di.weekend ? '주말' : hn >= 9 && hn < 18 ? '연구 시간' : hn >= 18 && hn < 23 ? '퇴근 후' : hn >= 23 || hn < 6 ? '한밤' : '출근 전';
-    const hm = `${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}`; clockEl.textContent = small() ? `${'일월화수목금토'[di.dow]} ${hm}` : `${'일월화수목금토'[di.dow]} ${hm} · ${mode}`; clockEl.title = mode; }
+    const hm = `${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}`; const wx = raining() ? '☔' : { spring: '🌸', summer: '☀', autumn: '🍂', winter: '❄' }[season()];
+    clockEl.textContent = small() ? `${'일월화수목금토'[di.dow]} ${hm} ${wx}` : `${'일월화수목금토'[di.dow]} ${hm} · ${mode} · ${wx}`; clockEl.title = mode;
+    if (party.on && !(birthdayPerson() && hn >= 15 && hn < 15.5)) party.on = false; }
   requestAnimationFrame(loop);
 }
 Promise.all(Object.keys(ASSETS).map(load)).then(async () => {
