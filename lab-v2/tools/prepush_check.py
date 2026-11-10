@@ -24,6 +24,10 @@ def main() -> int:
     base = sys.argv[1] if len(sys.argv) > 1 else "origin/claude/sharp-brown-8lieqe"
     files = subprocess.run(["git", "diff", "--name-only", f"{base}..HEAD"],
                            capture_output=True, text=True, check=True).stdout.split()
+    staged = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True).stdout.split()
+    if not files and staged:
+        print("차단: 커밋되지 않은 변경만 있음 — 커밋한 뒤 푸시 전에 실행해야 검사됨:", staged[:5])
+        return 4
     outside = [f for f in files if not f.startswith("lab-v2/")]
     if outside:
         print("차단: lab-v2/ 밖 변경 — 사용자 확인 필요:", outside)
