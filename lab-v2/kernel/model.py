@@ -66,6 +66,24 @@ class SourceStatus(str, enum.Enum):
     SEARCH_ONLY = "search_only"          # 검색 결과(스니펫)만 확인 — 원문 확인 아님
     ACCESS_RESTRICTED = "access_restricted"
     TRANSIENT_FAILED = "transient_failed"
+    SHELL_ONLY = "shell_only"            # 접속은 됐으나 본문 없는 껍데기(예: law.go.kr 프레임 1,279B) — 원문 확보 아님
+
+
+MIN_BODY_BYTES = 4000  # 이보다 작고 기대 표지가 없으면 껍데기로 본다(실제 시험 근거)
+
+
+def judge_retrieval(http: int, body: bytes, must_contain: list[str]) -> SourceStatus:
+    """접속 성공과 원문 확보를 구분한다. 기대 문구(예: '제34조')가 있어야 원문으로 인정."""
+    if http in (401, 403, 451) or http == 0:
+        return SourceStatus.ACCESS_RESTRICTED
+    if http >= 500:
+        return SourceStatus.TRANSIENT_FAILED
+    text = body.decode("utf-8", errors="ignore")
+    if must_contain and all(m in text for m in must_contain):
+        return SourceStatus.RETRIEVED
+    if len(body) < MIN_BODY_BYTES or must_contain:
+        return SourceStatus.SHELL_ONLY
+    return SourceStatus.RETRIEVED
 
 
 @dataclasses.dataclass

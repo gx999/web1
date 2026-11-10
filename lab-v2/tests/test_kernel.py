@@ -250,3 +250,22 @@ def test_ledger_survives_restart(tmp_path):
     l2 = Ledger(path)   # 프로세스 재시작 모사
     assert l2.get("T").checkpoint == {"done": ["S1"]}
     assert not l2.record("e1", task="T", type="x")
+
+
+# ---- 실제 시험(2026-11-10)에서 발견한 사례를 회귀 시험으로 고정 ----
+from kernel.manager import classify  # noqa: E402
+from kernel.model import ErrorClass, judge_retrieval  # noqa: E402
+
+
+def test_external_source_rate_limit_is_not_subscription_limit():
+    assert classify('OpenAlex "Rate limit exceeded"') == ErrorClass.TRANSIENT
+    assert classify("source_rate_limit: crossref 429") == ErrorClass.TRANSIENT
+    assert classify("Claude usage limit reached") == ErrorClass.LIMIT
+
+
+def test_shell_page_is_not_retrieved_source():
+    shell = b"<html><title>\xea\xb0\x9c\xec\x9d\xb8\xec\xa0\x95\xeb\xb3\xb4\xeb\xb3\xb4\xed\x98\xb8\xeb\xb2\x95</title><frameset/></html>" + b" " * 1100
+    assert judge_retrieval(200, shell, ["제34조"]) == SourceStatus.SHELL_ONLY
+    full = ("제34조(개인정보 유출등의 통지ㆍ신고) " * 200).encode()
+    assert judge_retrieval(200, full, ["제34조"]) == SourceStatus.RETRIEVED
+    assert judge_retrieval(0, b"", []) == SourceStatus.ACCESS_RESTRICTED

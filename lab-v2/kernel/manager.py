@@ -28,8 +28,17 @@ class Executor(Protocol):
 
 
 def classify(error: str) -> ErrorClass:
+    """오류 문자열 분류.
+
+    실제 시험(2026-11-10)에서 OpenAlex가 'Rate limit exceeded'(외부 출처의 IP 공유 한도)를
+    돌려줬다. 이것은 우리 구독 사용량 한도가 아니므로 LIMIT로 분류하면 안 된다.
+    구독 한도는 세션 메타데이터(rate_limit_info.status='limited') 또는 'usage limit'
+    문구로만 판정하고, 외부 출처 한도는 일시 장애로 보고 늦춰 재시도한다.
+    """
     e = error.lower()
-    if any(k in e for k in ("usage limit", "rate_limit", "rate limit", "limit reached", "quota", "overloaded_limit")):
+    if e.startswith("source_rate_limit:") or ("rate limit exceeded" in e and "usage" not in e):
+        return ErrorClass.TRANSIENT
+    if e.startswith("usage_limit:") or any(k in e for k in ("usage limit", "limit reached", "rate_limit_info=limited")):
         return ErrorClass.LIMIT
     if e.startswith("access:") or any(k in e for k in ("403", "captcha", "login required", "forbidden", "geo", "access denied", "connect_unreachable")):
         return ErrorClass.ACCESS
