@@ -27,17 +27,28 @@ class FakeExec:
         self.state = {}
         self.launched = []
         self.fail_launch = False
+        self.lost_response = False     # 세션은 생기지만 응답이 유실되는 경우
+        self.tags = {}
+        self.find_unknown = False
 
     def launch(self, task):
         if self.fail_launch:
             raise RuntimeError("503 temporarily unavailable")
         run = f"session_{next(self.n)}"
         self.state[run] = "running"
+        self.tags[f"lab-run:{task.id}#a{task.attempts}"] = run
         self.launched.append((task.id, run, dict(task.checkpoint)))
+        if self.lost_response:
+            raise TimeoutError("timed out waiting for create_session response")
         return run
 
     def status(self, run):
         return self.state.get(run, "gone")
+
+    def find(self, key):
+        if self.find_unknown:
+            return "unknown"
+        return self.tags.get(key)
 
 
 @pytest.fixture
@@ -191,15 +202,57 @@ def test_transient_retry_is_bounded(env):
     assert t.status == Status.FAILED and t.attempts == 3
 
 
-def test_launch_failure_is_retried_not_lost(env):
+def test_launch_failure_confirmed_absent_requeues_only_after_lease(env):
     m, l, ex, clock = env
     m.start_project("P")
     ex.fail_launch = True
     assert m.tick() == []
-    assert l.get("P:collect:v0").status == Status.QUEUED
+    t = l.get("P:collect:v0")
+    assert t.status == Status.RUNNING and t.lease_owner == "launching"   # 바로 재대기하지 않음
     ex.fail_launch = False
     clock.t += 61
-    assert len(m.tick()) == 1
+    assert m.tick() == [] and len(ex.launched) == 0                       # 임대 유지 중엔 재실행 없음
+    clock.t += LEASE_SECONDS
+    m.tick()                                    # 없음이 확인되고 임대도 만료 → 그때 재배정
+    assert len(ex.launched) == 1
+
+
+def test_lost_launch_response_adopts_existing_session_no_duplicate(env):
+    m, l, ex, clock = env
+    m.start_project("P")
+    ex.lost_response = True
+    m.tick()
+    assert len(ex.launched) == 1 and l.get("P:collect:v0").lease_owner == "launching"
+    ex.lost_response = False
+    clock.t += LEASE_SECONDS + 1
+    m.tick()
+    t = l.get("P:collect:v0")
+    assert t.lease_owner == ex.launched[0][1] and len(ex.launched) == 1   # 실제 세션을 찾아 채택
+
+
+def test_unknown_status_never_requeues_and_escalates(env):
+    m, l, ex, clock = env
+    m.start_project("P")
+    (tid, run), = m.tick()
+    ex.state[run] = "unknown"
+    for _ in range(3):
+        clock.t += LEASE_SECONDS + 1
+        m.tick()
+    t = l.get(tid)
+    assert len(ex.launched) == 1                       # 중복 실행 없음
+    assert t.status == Status.WAITING_USER and "확인 불가" in t.error_detail
+
+
+def test_find_unknown_does_not_relaunch(env):
+    m, l, ex, clock = env
+    m.start_project("P")
+    ex.lost_response = True
+    m.tick()
+    ex.lost_response, ex.find_unknown = False, True
+    for _ in range(3):
+        clock.t += LEASE_SECONDS + 1
+        m.tick()
+    assert len(ex.launched) == 1 and l.get("P:collect:v0").status == Status.WAITING_USER
 
 
 def test_review_independence_rules():

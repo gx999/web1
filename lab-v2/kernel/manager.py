@@ -18,13 +18,22 @@ LEASE_SECONDS = 45 * 60          # 한 실행의 임대 시간
 BACKOFF = [60, 300, 1800]        # 일시 장애 재시도 간격(초)
 LIMIT_RECHECK = 60 * 60          # 한도 재설정 시각을 모를 때의 재확인 간격
 MAX_REVISION_ROUNDS = 3
+UNKNOWN_LIMIT = 3
+# 재배정은 '실행이 끝났음이 확인된' 상태에서만 한다. unknown은 여기에 없다.
+ENDED_STATES = {"idle", "failed", "gone", "completed", "archived"}
+
+
+def launch_key(t: Task) -> str:
+    """세션 태그로 붙이는 실행 식별자. 응답 유실 시 이 태그로 실제 세션을 찾는다."""
+    return f"lab-run:{t.id}#a{t.attempts}"
 
 
 class Executor(Protocol):
-    """실행 세션을 띄우고 상태를 묻는 어댑터 (실제: create_session/get_session)."""
+    """실행 세션을 띄우고 상태를 묻는 어댑터 (실제: create_session/get_session/list_sessions)."""
 
     def launch(self, task: Task) -> str: ...
-    def status(self, run_id: str) -> str: ...  # running | idle | failed | unknown | gone
+    def status(self, run_id: str) -> str: ...  # running | idle | failed | gone | unknown
+    def find(self, key: str) -> str | None: ...  # 세션ID | None(없음 확인) | "unknown"(조회 실패)
 
 
 def classify(error: str) -> ErrorClass:
@@ -100,12 +109,18 @@ class Manager:
             return None
         # 2) 실행 세션 생성. 생성 응답이 유실되면 무조건 재생성하지 않는다:
         #    lease_owner='launching'으로 남겨 두고 다음 주기에 실제 실행 여부를 확인한다.
+        key = launch_key(t)
         try:
             run = self.x.launch(t)
         except Exception as exc:  # noqa: BLE001
-            self._on_error(t.id, str(exc))
+            # 응답이 유실됐을 뿐 세션은 생겼을 수 있다 → 다시 대기열에 넣지 않는다.
+            # 'launching' 임대를 유지하고, 다음 주기에 launch_key 태그로 실제 존재 여부를 찾는다.
+            self.l.update(t.id, t.rev, checkpoint={**t.checkpoint, "launch_error": str(exc)[:300],
+                                                   "launch_key": key})
+            self.l.record(f"{key}:launch_unconfirmed", task=t.id, type="launch_unconfirmed", at=now,
+                          detail=str(exc)[:300])
             return None
-        self.l.update(t.id, t.rev, lease_owner=run)
+        self.l.update(t.id, t.rev, lease_owner=run, checkpoint={**t.checkpoint, "launch_key": key})
         self.l.record(f"{t.id}:launch:{t.attempts}", task=t.id, type="launch", run=run, at=now)
         return run
 
@@ -173,11 +188,33 @@ class Manager:
     def _recover_leases(self, now: float) -> None:
         """임대 만료 과제: 실제 실행 여부를 확인한 뒤에만 재배정한다."""
         for t in self.l.all():
-            if t.status != Status.RUNNING or t.lease_until is None or t.lease_until > now:
+            if t.status != Status.RUNNING:
                 continue
-            st = self.x.status(t.lease_owner) if t.lease_owner not in (None, "launching") else "unknown"
+            if t.lease_owner == "launching":
+                # 실행 생성 응답이 유실된 과제: 태그로 실제 세션을 찾는다(시간 경과와 무관하게 매 주기).
+                found = self.x.find(t.checkpoint.get("launch_key", launch_key(t)))
+                if found and found != "unknown":
+                    self.l.update(t.id, t.rev, lease_owner=found, lease_until=now + LEASE_SECONDS)
+                    self.l.record(f"{t.id}:launch_found:{t.attempts}", task=t.id, type="launch_found",
+                                  run=found, at=now)
+                    continue
+                if found == "unknown":
+                    self._unknown_strike(t, now, "실행 생성 여부 조회 불가")
+                    continue
+                # found is None: 조회는 성공했고 그런 세션이 없다고 확인됨 → 임대 만료 후에만 재대기
+                if t.lease_until is not None and t.lease_until > now:
+                    continue
+                st = "gone"
+            else:
+                if t.lease_until is None or t.lease_until > now:
+                    continue
+                st = self.x.status(t.lease_owner) if t.lease_owner else "unknown"
             if st == "running":
                 self.l.update(t.id, t.rev, lease_until=now + LEASE_SECONDS)  # 아직 일하는 중
+                continue
+            if st not in ENDED_STATES:
+                # 'unknown' 등 확인 불가 상태는 절대 재배정하지 않는다(중복 실행 방지).
+                self._unknown_strike(t, now, f"실행 상태 확인 불가({st})")
                 continue
             self.l.record(f"{t.id}:lease_expired:{t.attempts}", task=t.id, type="lease_expired",
                           run=t.lease_owner, observed=st, at=now)
@@ -187,6 +224,18 @@ class Manager:
             else:
                 # 체크포인트는 유지 → 다음 실행이 저장 지점부터 재개
                 self.l.update(t.id, t.rev, status=Status.QUEUED, lease_owner=None, lease_until=None)
+
+    def _unknown_strike(self, t: Task, now: float, why: str) -> None:
+        n = int(t.checkpoint.get("unknown_checks", 0)) + 1
+        cp = {**t.checkpoint, "unknown_checks": n, "unknown_last": why}
+        self.l.record(f"{t.id}:unknown:{t.attempts}:{n}", task=t.id, type="status_unknown", why=why, at=now)
+        if n >= UNKNOWN_LIMIT:
+            # 임대는 지운 채 사람 판단으로 넘긴다. 자동 재배정하지 않는다.
+            self.l.update(t.id, t.rev, status=Status.WAITING_USER, checkpoint=cp,
+                          error_class=ErrorClass.TRANSIENT,
+                          error_detail=f"{why} {n}회 — 실제 실행 여부를 확인한 뒤 재배정 필요")
+        else:
+            self.l.update(t.id, t.rev, checkpoint=cp, lease_until=now + LEASE_SECONDS)
 
     def _wake_waiting(self, now: float) -> None:
         for t in self.l.all():

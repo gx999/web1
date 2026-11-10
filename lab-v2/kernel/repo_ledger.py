@@ -104,7 +104,10 @@ class RepoLedger:
         return new
 
     # ---- 사건 ---------------------------------------------------------
-    def record(self, event_id: str, day: str, **fields: Any) -> bool:
+    def record(self, event_id: str, day: str | None = None, **fields: Any) -> bool:
+        if day is None:
+            import datetime
+            day = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
         rel = os.path.join("ledger", "events", f"{day}.jsonl")
         p = os.path.join(self.root, rel)
         os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -116,6 +119,36 @@ class RepoLedger:
             f.write(json.dumps({"event_id": event_id, **fields}, ensure_ascii=False) + "\n")
         self._commit_push([rel], f"event: {event_id}")
         return True
+
+    # ---- 출처(과제별 파일, 한 출처 실패가 다른 출처를 지우지 않음) ----------------
+    def put_source(self, task_id: str, src: Any) -> None:
+        d = dataclasses.asdict(src)
+        d["status"] = getattr(src.status, "value", src.status)
+        rel = os.path.join("sources", _safe(task_id), _safe(src.id) + ".json")
+        self.write_json(rel, d, f"source: {task_id}/{src.id}")
+
+    def sources_of(self, task_id: str) -> list[Any]:
+        from .model import Source, SourceStatus
+        base = os.path.join(self.root, "sources", _safe(task_id))
+        out = []
+        if os.path.isdir(base):
+            for fn in sorted(os.listdir(base)):
+                if fn.endswith(".json"):
+                    with open(os.path.join(base, fn), encoding="utf-8") as f:
+                        d = json.load(f)
+                    out.append(Source(**{**d, "status": SourceStatus(d["status"])}))
+        return out
+
+    def flush(self, attempts: int = 3) -> None:
+        """일괄 모드(push=False)에서 모은 커밋을 한 번에 푸시. 거절 시 rebase 후 재시도."""
+        for _ in range(attempts):
+            if self._git("push", "-q", "origin", f"HEAD:{self.branch}", check=False).returncode == 0:
+                return
+            self._git("fetch", "-q", "origin", self.branch)
+            if self._git("rebase", "-q", f"origin/{self.branch}", check=False).returncode != 0:
+                self._git("rebase", "--abort", check=False)
+                raise ConflictError("일괄 푸시 중 같은 파일 충돌 — 이번 실행 결과를 버리고 다음 주기에 다시 판단")
+        raise ConflictError("push 재시도 한도 초과")
 
     def write_json(self, rel: str, obj: Any, message: str) -> None:
         p = os.path.join(self.root, rel)
