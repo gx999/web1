@@ -16,7 +16,10 @@ import os
 import time
 from typing import Any
 
+# 공식 문서(Spend limits, API credits) 확인 코드 포함: 429 + 아래 코드는 재시도하지 않는다.
 STOP_ERRORS = ("credit_balance_exhausted", "insufficient_quota", "billing_hard_limit_reached",
+               "project_spend_limit_exceeded", "organization_spend_limit_exceeded",
+               "organization_usage_limit_exceeded", "spend_limit", "usage_limit_exceeded",
                "billing", "payment", "account_deactivated", "quota")
 
 

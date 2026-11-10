@@ -109,3 +109,12 @@ def test_extracts_text_from_raw_responses_shape(tmp_path):
     b = mk(tmp_path)
     r = call_model(b, FakeHTTP((200, raw)), "c1", "test-model", "x", 10)
     assert r["text"] == "요약 1\n요약 2" and r["response_id"] == "resp_x"
+
+
+@pytest.mark.parametrize("code", ["project_spend_limit_exceeded", "organization_spend_limit_exceeded",
+                                  "organization_usage_limit_exceeded", "credit_balance_exhausted"])
+def test_official_429_billing_codes_stop_without_retry(tmp_path, code):
+    b = mk(tmp_path)
+    http = FakeHTTP((429, {"error": {"code": code, "message": "limit"}}), OK)
+    r = call_model(b, http, "c1", "test-model", "x", 100)
+    assert not r["ok"] and len(http.sent) == 1 and b.report()["killed"]
