@@ -71,7 +71,7 @@ lab-v2 코드 수정, 기존 v1 연구소·P1 기록 변경. 의심되면 아무
 
 1. RUN=run-$(date -u +%Y%m%dT%H%M%SZ). `ls /home/user`, `date -u` 기록.
    D=/home/user/daeyong-lab (없으면 8로).
-   `git -C /home/user/web1 fetch -q origin claude/sharp-brown-8lieqe && git -C /home/user/web1 worktree add /tmp/w 66c49e8`
+   `git -C /home/user/web1 fetch -q origin claude/sharp-brown-8lieqe && git -C /home/user/web1 worktree add /tmp/w feff2a1`
    cd /tmp/w/lab-v2 ; M="python tools/manager_run.py --repo $D"
 2. `$M lock --run $RUN` → acquired=false면 8로(다른 실행 진행 중).
 3. `$M plan-observe` → schedule_expired=true면: mcp__claude-code-remote__list_triggers가 있으면 이름이
@@ -86,3 +86,5 @@ lab-v2 코드 수정, 기존 v1 연구소·P1 기록 변경. 의심되면 아무
    `cd $D && git add -A && (git commit -qm "run: $RUN" || true) && git push origin HEAD:main`
    (거절 시 git pull --rebase 후 1회 재시도, 충돌이면 그대로 종료). 같은 요약을 최종 답변에도 쓰세요.
 ```
+
+- 2026-11-10 13:21Z: 고정 커밋 feff2a1(Notion 마크다운 정규화)로 사용자가 예약 지시문 수정. 화면에서 만든 예약은 관리 세션이 수정·끄기 불가(실행 세션 자신은 끄기만 가능).
