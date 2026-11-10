@@ -57,8 +57,10 @@ class Budget:
     def _load(self) -> dict[str, Any]:
         if os.path.exists(self.path):
             with open(self.path, encoding="utf-8") as f:
-                return json.load(f)
-        return {"provider": self.provider, "spent_usd": 0.0, "reserved": {}, "calls": [], "killed": None}
+                s = json.load(f)
+            s.setdefault("pending", {})
+            return s
+        return {"pending": {}, "provider": self.provider, "spent_usd": 0.0, "reserved": {}, "calls": [], "killed": None}
 
     def _save(self) -> None:
         os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
@@ -99,13 +101,21 @@ class Budget:
         if worst > self.remaining():
             raise BudgetBlocked(f"최악 비용 {worst:.4f} > 잔여 예산 {self.remaining():.4f}")
         self.s["reserved"][call_id] = worst
+        self.s["pending"][call_id] = {"model": model, "reserved_at": self.now()}
         self._save()
         return worst
+
+    def note_pending(self, call_id: str, **meta: Any) -> None:
+        """진행 중 호출의 복구 단서(세션 ID·이전 턴 목록 등)를 전송 전에 원장에 남긴다."""
+        if call_id in self.s["pending"]:
+            self.s["pending"][call_id].update(meta)
+            self._save()
 
     # ---- 호출 후 ----------------------------------------------------------
     def settle(self, call_id: str, model: str, usage: dict[str, int] | None, tool_calls: int = 0,
                error: str | None = None) -> float:
         worst = self.s["reserved"].pop(call_id, None)
+        self.s["pending"].pop(call_id, None)
         if worst is None:
             raise BudgetBlocked(f"예약 없는 정산: {call_id}")
         if usage and "input_tokens" in usage and "output_tokens" in usage:

@@ -79,6 +79,11 @@ class RepoLedger:
                         out.append(_task_from_json(json.load(f)))
         return out
 
+    @property
+    def tasks(self) -> dict[str, Task]:
+        """메모리 원장(Ledger.tasks)과 같은 조회 모양 — inbox 규칙이 대상 과제 존재를 확인할 때 사용."""
+        return {t.id: t for t in self.all()}
+
     def _write(self, t: Task) -> str:
         rel = self._path(t)
         p = os.path.join(self.root, rel)
@@ -138,6 +143,37 @@ class RepoLedger:
                         d = json.load(f)
                     out.append(Source(**{**d, "status": SourceStatus(d["status"])}))
         return out
+
+    def try_lock(self, owner: str, now: float, ttl: float = 50 * 60, rel: str = "ops/manager_lock.json") -> tuple[bool, dict]:
+        """관리자 실행 잠금(원격 저장소 푸시로 판정). 다른 실행이 잠금을 잡고 있고 만료 전이면 False.
+        푸시가 거절되면(동시에 잡으려 함) 원격 상태로 되돌리고 False — 같은 작업의 이중 실행 방지."""
+        self.sync()
+        p = os.path.join(self.root, rel)
+        cur = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else None
+        if cur and cur.get("owner") != owner and cur.get("released_at") is None and now < cur.get("expires_at", 0):
+            return False, cur
+        lock = {"owner": owner, "acquired_at": now, "expires_at": now + ttl, "released_at": None,
+                "previous": {k: cur.get(k) for k in ("owner", "acquired_at", "released_at", "expires_at")} if cur else None}
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(lock, f, ensure_ascii=False, indent=1)
+        self._git("add", "--", rel)
+        self._git("-c", f"user.name={self.author}", "-c", f"user.email={self.email}", "commit", "-q", "-m",
+                  f"lock: {owner}")
+        if self._git("push", "-q", "origin", f"HEAD:{self.branch}", check=False).returncode != 0:
+            self._git("fetch", "-q", "origin", self.branch)
+            self._git("reset", "-q", "--hard", f"origin/{self.branch}")
+            return False, json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
+        return True, lock
+
+    def release_lock(self, owner: str, now: float, rel: str = "ops/manager_lock.json") -> None:
+        p = os.path.join(self.root, rel)
+        if not os.path.exists(p):
+            return
+        cur = json.load(open(p, encoding="utf-8"))
+        if cur.get("owner") == owner:
+            cur["released_at"] = now
+            self.write_json(rel, cur, f"unlock: {owner}")
 
     def flush(self, attempts: int = 3) -> None:
         """일괄 모드(push=False)에서 모은 커밋을 한 번에 푸시. 거절 시 rebase 후 재시도."""

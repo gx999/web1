@@ -84,3 +84,44 @@ def test_kci_parse_and_relevance_guard():
     assert good.issue_date == "2026.03" and good.kci_listed and good.relevant
     assert not bad.relevant           # 검색어를 무시한 결과는 선행연구로 쓰지 않음
     assert good.status == bad.status == "search_only"
+
+
+from collectors.retry import RetryingFetch  # noqa: E402
+
+
+def _seq(*codes):
+    calls = []
+
+    def f(url):
+        calls.append(url)
+        c = codes[min(len(calls) - 1, len(codes) - 1)]
+        return (c, SHELL) if "%EB%B2%95%EB%A0%B9" in url else (c, BODY)
+    return f, calls
+
+
+def test_transient_connect_failure_retried_then_succeeds():
+    f, calls = _seq(0, 0, 200, 200)
+    rf = RetryingFetch(f, attempts=3, sleep=lambda s: None)
+    a = law_go_kr.fetch_article("개인정보보호법", "제34조", rf)
+    assert a.status == "retrieved" and len(calls) == 4      # 법령 페이지 3회(2회 실패) + 본문 1회
+
+
+def test_repeated_connect_failure_is_transient_with_cause_not_access_restricted():
+    f, calls = _seq(0)
+    rf = RetryingFetch(f, attempts=3, sleep=lambda s: None)
+    a = law_go_kr.fetch_article("개인정보보호법", "제34조", rf)
+    assert a.status == "transient_failed" and "connect_failed" in a.note and len(calls) == 3
+
+
+def test_access_denied_is_not_retried():
+    f, calls = _seq(403)
+    a = law_go_kr.fetch_article("개인정보보호법", "제34조", RetryingFetch(f, sleep=lambda s: None))
+    assert a.status == "access_restricted" and len(calls) == 1
+
+
+def test_same_url_served_from_cache_within_run():
+    f, calls = _seq(200)
+    rf = RetryingFetch(f, sleep=lambda s: None)
+    law_go_kr.fetch_article("개인정보보호법", "제34조", rf)
+    law_go_kr.fetch_article("개인정보보호법", "제29조", rf)
+    assert len(calls) == 2

@@ -12,6 +12,8 @@ import html
 import re
 import urllib.parse
 from dataclasses import dataclass
+
+from .retry import cause_of
 from typing import Callable
 
 BASE = "https://www.law.go.kr"
@@ -58,22 +60,34 @@ def extract_article(full_text: str, article: str) -> str:
     return full_text[start:start + 4000].strip()
 
 
+def _fail_status(code: int) -> str:
+    """최종 HTTP 결과 → 출처 상태. 연결 실패·429·5xx는 (재시도 후에도) transient_failed로 둔다:
+    차단인지 일시 장애인지 확인되지 않았기 때문. 401/403/451만 access_restricted."""
+    c = cause_of(code)
+    if c == "access_denied":
+        return "access_restricted"
+    if c == "not_found":
+        return "not_found"
+    return "transient_failed"
+
+
 def fetch_article(law_name: str, article: str, fetch: Fetch) -> StatuteArticle:
+    note = (lambda: fetch.last_note()) if hasattr(fetch, "last_note") else (lambda: "")
     try:
         seq, ef, code = resolve(law_name, fetch)
     except Exception as exc:  # noqa: BLE001
-        return StatuteArticle(law_name, article, "transient_failed", BASE, note=str(exc)[:200])
-    if code in (0, 401, 403, 451):
-        return StatuteArticle(law_name, article, "access_restricted", BASE, note=f"http {code}")
+        return StatuteArticle(law_name, article, "transient_failed", BASE, note=f"program_error: {str(exc)[:180]}")
+    if cause_of(code):
+        return StatuteArticle(law_name, article, _fail_status(code), BASE,
+                              note=f"cause={cause_of(code)} http {code}; {note()}")
     if not seq:
         return StatuteArticle(law_name, article, "not_found", BASE, note="본문 주소(lsiSeq)를 찾지 못함")
     url = (f"{BASE}/LSW/lsInfoR.do?lsiSeq={seq}&chrClsCd=010202&urlMode=lsInfoR"
            f"&efYd={ef}&ancYnChk=0")
     code, body = fetch(url)
-    if code in (0, 401, 403, 451):
-        return StatuteArticle(law_name, article, "access_restricted", url, seq, ef, note=f"http {code}")
-    if code >= 500:
-        return StatuteArticle(law_name, article, "transient_failed", url, seq, ef, note=f"http {code}")
+    if cause_of(code):
+        return StatuteArticle(law_name, article, _fail_status(code), url, seq, ef,
+                              note=f"cause={cause_of(code)} http {code}; {note()}")
     text = extract_article(_text(body), article)
     status = "retrieved" if text else "shell_only"
     return StatuteArticle(law_name, article, status, url, seq, ef, text,

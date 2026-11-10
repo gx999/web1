@@ -24,6 +24,10 @@ from kernel.ledger import ConflictError  # noqa: E402
 from kernel.manager import Manager, launch_key  # noqa: E402
 from kernel.model import Source, SourceStatus, Status  # noqa: E402
 from kernel.repo_ledger import RepoLedger, _safe  # noqa: E402
+from kernel import directives as dv  # noqa: E402
+
+APPROVED_SCOPES = ["침해사고", "개인정보", "디지털 증거", "형사절차", "정보통신망", "사이버"]
+ARTICLE_RE = __import__("re").compile(r"\s*(.+?)\s+(제\d+조(?:의\d+)?)\s*$")
 
 
 class Deferred(Exception):
@@ -136,6 +140,35 @@ def cmd_adopt(L: RepoLedger, args) -> dict:
     return {"adopted": None, "note": "해당 키의 launching 과제 없음(이미 연결됐거나 없음)"}
 
 
+def _read(root: str, rel: str, default=None):
+    p = os.path.join(root, rel)
+    return json.load(open(p, encoding="utf-8")) if os.path.exists(p) else default
+
+
+def _tests(root: str) -> list[dict]:
+    """tests/ 아래 시험 실행 기록(시험용 — 연구 성과 아님)."""
+    out = []
+    calls = {c["id"]: c for c in (_read(root, "ops/budget_openai_agents.json") or {}).get("calls", [])}
+    corr = _read(root, "tests/agents_pilot/CORRECTIONS.json", {})
+    name = {"draft": "draft_v0", "review": "review_v0", "revise": "draft_v1"}
+    base = os.path.join(root, "tests", "agents_pilot")
+    for rid in sorted(d for d in os.listdir(base) if os.path.isdir(os.path.join(base, d))) if os.path.isdir(base) else []:
+        r = _read(root, f"tests/agents_pilot/{rid}/run.json", {})
+        steps = [x for x in r.get("steps", []) if x.get("stage") != "collect"]
+        src = next((x["sources"] for x in r.get("steps", []) if x.get("stage") == "collect"), [])
+        out.append({"run_id": rid, "test": True, "kind": "openai_agents_pilot", "result": r.get("result"),
+                    "started_at": r.get("started_at"), "finished_at": r.get("finished_at"),
+                    "steps": [{"stage": x["stage"], "model": x.get("model"), "ok": x.get("ok"),
+                               "session_id": x.get("session_id"),
+                               "cost_usd": calls.get(f"{rid}:{name.get(x['stage'])}", {}).get("cost", x.get("cost")),
+                               "basis": calls.get(f"{rid}:{name.get(x['stage'])}", {}).get("basis", x.get("basis"))}
+                              for x in steps],
+                    "corrections": corr.get(rid, []),
+                    "sources": {x["article"]: x["status"] for x in src},
+                    "path": f"tests/agents_pilot/{rid}/"})
+    return out
+
+
 def cmd_summary(L: RepoLedger, args) -> dict:
     now = _now(args)
     iso = dt.datetime.fromtimestamp(now, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -144,15 +177,175 @@ def cmd_summary(L: RepoLedger, args) -> dict:
         def all(self_inner):
             return L.all()
     s = inbox_summary(_Mem(), iso)
+    prev = _read(L.root, "status/summary.json", {})
     obs = json.load(open(args.obs, encoding="utf-8")) if args.obs else {}
+    s["writer"] = "claude_manager"
+    s["note"] = ("rows/counts = v2 원장 과제의 원본 상태값. 지시(directives)·OpenAI 작업(openai_jobs)·시험(tests)·"
+                 "외부 관측(external_observed)은 별개 항목이며 서로 합산하지 않음")
+    s["projects"] = prev.get("projects", {})
+    s["directives"] = {k: v for k, v in (_read(L.root, "status/directives/index.json") or
+                                         {"total": 0, "counts": {}, "rows": []}).items() if k != "writer"}
+    s["openai_jobs"] = [{"job": j["id"], "directive_id": j.get("directive_id"), "state": j.get("state"),
+                         "reason": j.get("state_reason", ""), "test": j.get("test")} for j in _jobs(L.root).values()]
+    s["tests"] = _tests(L.root)
+    s["external_observed"] = _read(L.root, "ops/external_observations.json", [])
+    b = _read(L.root, "ops/budget_openai_agents.json")
+    s["budgets"] = {"openai_agents": None if b is None else
+                    {"spent_usd_internal": b["spent_usd"], "reserved": b["reserved"], "killed": b["killed"],
+                     "calls": len(b["calls"]), "note": "내부 집계(토큰×공식 요금, 캐시 입력도 정가). 청구액 아님"},
+                    "openai_gate": _openai_gate(L.root)[1]}
     s["operations"] = {"manager_run": args.run or "unknown", "usage_signal": obs.get("usage_signal", "미확인"),
-                       "is_using_overage": obs.get("is_using_overage"), "schedule": _cfg(L.root)}
+                       "is_using_overage": obs.get("is_using_overage"), "schedule": _cfg(L.root) or "없음",
+                       "unattended_verified": prev.get("operations", {}).get("unattended_verified", False)}
     L.write_json("status/summary.json", s, f"status: summary {iso}")
     L.record(f"tick:{args.run or int(now)}:summary", type="manager_run", run=args.run, at=iso,
              counts=s["counts"])
     if args.push:
         L.flush()
-    return {"observed_at": iso, "counts": s["counts"], "total": s["total"]}
+    return {"observed_at": iso, "counts": s["counts"], "total": s["total"],
+            "directives": s["directives"].get("counts"), "tests": len(s["tests"])}
+
+
+# ---- 지시함·OpenAI 연구원 작업 ------------------------------------------------
+def _jobs(root: str) -> dict[str, dict]:
+    d = os.path.join(root, "ledger", "jobs")
+    if not os.path.isdir(d):
+        return {}
+    return {f[:-5]: json.load(open(os.path.join(d, f), encoding="utf-8")) for f in sorted(os.listdir(d))
+            if f.endswith(".json")}
+
+
+def parse_articles(content: str) -> list[list[str]]:
+    """지시 내용의 '조문: 법령명 제N조; 법령명 제N조의M' 줄을 읽는다(없으면 빈 목록 → blocked)."""
+    for line in content.splitlines():
+        if line.strip().startswith("조문:"):
+            out = []
+            for part in line.split(":", 1)[1].split(";"):
+                m = ARTICLE_RE.match(part)
+                if m:
+                    out.append([m.group(1).strip(), m.group(2)])
+            return out
+    return []
+
+
+def cmd_inbox(L: RepoLedger, args) -> dict:
+    """관리자 세션이 Notion 조회 결과(rows 모드 JSON)를 파일로 넘긴다. Notion에는 쓰지 않는다."""
+    now = _iso(args)
+    rows = json.load(open(args.rows, encoding="utf-8"))
+    rows = rows.get("results", rows) if isinstance(rows, dict) else rows
+    store = dv.DirectiveStore(L.root, L.write_json)
+
+    def new_job(d: dict, row: dict) -> str:
+        jid = "J-" + _safe(d["directive_id"])
+        L.write_json(f"ledger/jobs/{jid}.json",
+                     {"id": jid, "directive_id": d["directive_id"], "test": d["test"], "question": d["content"],
+                      "articles": parse_articles(d["content"]), "state": "accepted", "steps": {},
+                      "created_at": now}, f"job: {jid} created")
+        return jid
+    known = {d["notion_row"] for d in store.all()}
+    migrated = []
+    for r in rows:                     # 이전 형식(inbox_seen/)으로 이미 처리된 행은 다시 실행하지 않고 기록만 이관
+        rid = dv.row_id(r)
+        old = _read(L.root, f"inbox_seen/{rid}.json")
+        if old and rid not in known and r.get("요청ID"):
+            rec = {"directive_id": r["요청ID"], "notion_row": rid, "notion_url": r.get("url"), "kind": r.get("종류"),
+                   "content": (r.get("내용") or "")[:2000], "target": r.get("대상") or "", "author": r.get("작성자"),
+                   "test": r.get("시험") == "__YES__", "notion_created": r.get("작성 시각"),
+                   "content_sha256": dv.content_sha(r), "received_at": old.get("processed_at"), "updated_at": now,
+                   "state": old.get("result", "answered"), "state_reason": old.get("reason", ""),
+                   "history": [{"at": old.get("processed_at"), "state": old.get("result"),
+                                "reason": "이전 처리 기록(inbox_seen/)에서 이관 — 재실행 안 함"}],
+                   "tasks": [], "jobs": [], "evidence": [],
+                   "results": [{"kind": "answer", "path": old.get("answer_ref")}] if old.get("answer_ref") else []}
+            store.put(rec)
+            migrated.append(rid)
+    res = dv.intake(rows, store, L, APPROVED_SCOPES, now, on_openai_job=new_job)
+    store.write_index(now)
+    return {"observed_at": now, "migrated": migrated, "processed": res}
+
+
+def _openai_gate(root: str) -> tuple[bool, str]:
+    """ops/openai_gate.json: 사용자 확인 항목이 모두 기록돼야 유료 호출 허용. 파일 자체가 없으면 차단."""
+    p = os.path.join(root, "ops", "openai_gate.json")
+    if not os.path.exists(p):
+        return False, "ops/openai_gate.json 없음 — 사용자 확인 전 OpenAI 호출 차단"
+    g = json.load(open(p, encoding="utf-8"))
+    need = ["credit_org_project", "credit_balance_checked", "auto_recharge_off", "payment_method_status",
+            "project_hard_limit_usd", "confirmed_by_user_at"]
+    miss = [k for k in need if not g.get(k)]
+    if miss or not g.get("enabled"):
+        return False, f"사용자 확인 미완료: {miss or ['enabled=false']}"
+    return True, "ok"
+
+
+def cmd_run_openai(L: RepoLedger, args, http=None, fetch=None) -> dict:
+    from collectors.law_go_kr import urllib_fetch
+    from collectors.retry import RetryingFetch
+    from kernel.agents_pipeline import run_chain
+    from kernel.budget import Budget
+    from kernel.openai_agents import recover_pending, urllib_transport
+    from tools.agents_pilot import LIMITS, PRICES, DRAFT_MODEL, REVIEW_MODEL
+    now = _iso(args)
+    jobs = _jobs(L.root)
+    store = dv.DirectiveStore(L.root, L.write_json)
+    ok, why = _openai_gate(L.root) if http is None else (True, "mock transport")
+    ran = []
+    if not ok:
+        for jid, j in jobs.items():
+            if j.get("state") in ("accepted", "running") and j.get("state_reason") != why:
+                j["state_reason"], j["updated_at"] = why, now
+                L.write_json(f"ledger/jobs/{jid}.json", j, f"job: {jid} gated")
+        dv.refresh(store, L, _jobs(L.root), now)
+        return {"ran": [], "gate": why}
+    http = http or urllib_transport
+    budget = Budget(os.path.join(L.root, "ops", "budget_openai_agents.json"), "openai", LIMITS, PRICES)
+    recovered = recover_pending(budget, http)
+    for jid, j in jobs.items():
+        if j.get("state") not in ("accepted", "running"):
+            continue
+        if len(ran) >= int(args.max_jobs or 1):
+            break
+        out_dir = os.path.join("jobs", jid)
+
+        def save(job, jid=jid):
+            L.write_json(f"ledger/jobs/{jid}.json", job, f"job: {jid} {job.get('state', '')}")
+
+        def write_text(name, text, out_dir=out_dir):
+            rel = out_dir + "/" + "/".join(_safe(x) for x in name.split("/"))
+            p = os.path.join(L.root, rel)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(text)
+            L._commit_push([rel], f"job {jid}: {name}")
+            return rel
+        j["state"] = "running"
+        try:
+            run_chain(j, budget, http, fetch or RetryingFetch(urllib_fetch), save, write_text,
+                      {"draft": DRAFT_MODEL, "review": REVIEW_MODEL}, clock=lambda: _now(args) if args.now else time.time(),
+                      turn_kwargs={"sleep": (lambda s: None) if args.now else time.sleep})
+        except Exception as exc:  # noqa: BLE001 — 한 작업의 실패가 다른 작업을 막지 않게
+            j["state"], j["state_reason"] = "failed", f"program_error: {str(exc)[:200]}"
+            save(j)
+        ran.append({"job": jid, "state": j["state"], "reason": j.get("state_reason", "")})
+    dv.refresh(store, L, _jobs(L.root), now)
+    return {"ran": ran, "recovered": recovered, "budget": budget.report()}
+
+
+def cmd_lock(L: RepoLedger, args) -> dict:
+    """매 실행 첫 단계. 잠금을 못 잡으면 이번 실행은 아무것도 하지 않고 끝낸다(이중 실행 방지)."""
+    ok, cur = L.try_lock(args.run, _now(args))
+    L.record(f"lock:{args.run}", type="manager_lock", run=args.run, acquired=ok,
+             held_by=None if ok else cur.get("owner"))
+    return {"acquired": ok, "held_by": None if ok else cur.get("owner"), "expires_at": cur.get("expires_at")}
+
+
+def cmd_unlock(L: RepoLedger, args) -> dict:
+    L.release_lock(args.run, _now(args))
+    return {"released": args.run}
+
+
+def _iso(args) -> str:
+    return dt.datetime.fromtimestamp(_now(args), dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def worker_prompt(task_id: str, key: str, stage: str, brief: str, repo: str = "gx999/daeyong-lab") -> str:
@@ -171,7 +364,9 @@ web1 저장소의 규칙 문서(lab-v2/prompts/common-rules.md, stages.md의 {st
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["plan-observe", "tick", "adopt", "summary", "prompt"])
+    ap.add_argument("cmd", choices=["plan-observe", "tick", "adopt", "summary", "prompt", "inbox", "run-openai", "lock", "unlock"])
+    ap.add_argument("--rows")
+    ap.add_argument("--max-jobs")
     ap.add_argument("--repo", required=True)
     ap.add_argument("--obs")
     ap.add_argument("--now")
@@ -188,7 +383,8 @@ def main() -> None:
                                        json.dumps(t.checkpoint.get("brief", ""), ensure_ascii=False))}
     else:
         out = {"plan-observe": cmd_plan_observe, "tick": cmd_tick, "adopt": cmd_adopt,
-               "summary": cmd_summary}[a.cmd](L, a)
+               "summary": cmd_summary, "inbox": cmd_inbox, "run-openai": cmd_run_openai,
+               "lock": cmd_lock, "unlock": cmd_unlock}[a.cmd](L, a)
     print(json.dumps(out, ensure_ascii=False, indent=1))
 
 

@@ -89,10 +89,12 @@ def run_turn(budget: Budget, http: Transport, call_id: str, model: str, text: st
         if not 200 <= st < 300:
             return _fail(budget, call_id, model, session_id, _err(st, data), charged_worst=st not in (400, 401, 403, 404, 422))
         session_id = data["id"]
+        budget.note_pending(call_id, session_id=session_id, known_turns=[], stage="submitted")
     else:
         st, data = _send(http, "GET", f"{API}/agents/sessions/{session_id}/turns?order=desc&limit=20",
                          _headers(), None, t, budget.lim.max_retries)
         known = {x["id"] for x in data.get("data", [])} if 200 <= st < 300 else set()
+        budget.note_pending(call_id, session_id=session_id, known_turns=sorted(known), stage="submitting")
         body = {"events": [{"type": "agent.session.input.message", "input": msg}]}
         st, data = _send(http, "POST", f"{API}/agents/sessions/{session_id}/events", _headers(call_id), body, t,
                          budget.lim.max_retries)
@@ -178,6 +180,52 @@ def _fail(budget: Budget, call_id: str, model: str, session_id: str | None, err:
         budget.kill(f"제공자 비용·쿼터 오류: {err[:120]}")
     return {"ok": False, "error": err, "cost": cost, "basis": basis, "session_id": session_id,
             "turn_id": (turn or {}).get("id")}
+
+
+def recover_pending(budget: Budget, http: Transport, stale_s: int = 3600) -> list[dict]:
+    """재시작 후: 정산되지 않은 예약(중단된 호출)을 실제 턴 상태로 정리한다.
+    - 세션 ID 있음 + 새 턴 종료 → 그 턴의 usage로 정산(없으면 최악값)
+    - 새 턴 진행 중 → 그대로 둠(예약액은 계속 잔여 예산에서 빠짐). 오래되면 취소 요청 후 다음 복구에서 정산
+    - 세션 ID 있음 + 새 턴 없음 + 오래됨 → 제출되지 않은 것으로 보고 0원 정산(근거 기록)
+    - 세션 ID 없음(생성 응답 전 중단) + 오래됨 → 처리됐을 수 있으므로 최악값 정산
+    """
+    out = []
+    now = budget.now()
+    for cid, meta in list(budget.s.get("pending", {}).items()):
+        model, sid, age = meta["model"], meta.get("session_id"), now - meta.get("reserved_at", now)
+        if not sid:
+            if age > stale_s:
+                c = budget.settle(cid, model, None, error="재시작 복구: 세션 생성 응답 미확인 — 최악값 정산")
+                out.append({"call": cid, "action": "settled_worst", "cost": c})
+            else:
+                out.append({"call": cid, "action": "wait", "why": "세션 ID 미기록, 아직 오래되지 않음"})
+            continue
+        st, data = _send(http, "GET", f"{API}/agents/sessions/{sid}/turns?order=desc&limit=20", _headers(), None,
+                         budget.lim.timeout_s, budget.lim.max_retries)
+        if not 200 <= st < 300:
+            out.append({"call": cid, "action": "wait", "why": f"조회 실패 {_err(st, data)[:80]}"})
+            continue
+        new = [x for x in data.get("data", []) if x["id"] not in set(meta.get("known_turns", []))
+               and not x.get("subagent_id")]
+        if new and new[0].get("status") in TURN_END:
+            u = _usage(new[0].get("usage"))
+            c = budget.settle(cid, model, u, error=None if new[0]["status"] == "completed"
+                              else f"재시작 복구: 턴 {new[0]['status']}")
+            out.append({"call": cid, "action": "settled", "turn": new[0]["id"], "basis": "usage" if u else "worst",
+                        "cost": c})
+        elif new:
+            if age > stale_s:
+                _send(http, "POST", f"{API}/agents/sessions/{sid}/events", _headers(),
+                      {"events": [{"type": "agent.session.input.cancel"}]}, budget.lim.timeout_s, 0)
+            out.append({"call": cid, "action": "wait", "why": f"턴 진행 중({new[0].get('status')})",
+                        "cancel_requested": age > stale_s})
+        elif age > stale_s:
+            c = budget.settle(cid, model, {"input_tokens": 0, "output_tokens": 0},
+                              error="재시작 복구: 제출된 턴 없음(오래됨) — 0원 정산")
+            out.append({"call": cid, "action": "settled_zero_no_turn", "cost": c})
+        else:
+            out.append({"call": cid, "action": "wait", "why": "새 턴 아직 없음"})
+    return out
 
 
 def urllib_transport(method: str, url: str, headers: dict, body: dict | None, timeout: int) -> tuple[int, dict]:

@@ -120,3 +120,61 @@ def test_reconcile_replaces_worst_case_with_late_usage(tmp_path):
     c = b.s["calls"][0]
     assert c["basis"] == "usage_reconciled" and c["corrections"][0]["from"] == worst
     assert abs(b.report()["spent_usd"] - 0.002) < 1e-9
+
+
+from kernel.openai_agents import recover_pending  # noqa: E402
+
+
+class Crash(BaseException):   # 프로세스 중단 모사(일반 예외 처리에 잡히지 않음)
+    pass
+
+
+def test_restart_mid_turn_keeps_reservation_then_settles_from_turn_usage(tmp_path):
+    b = mk(tmp_path)
+    calls = {"n": 0}
+
+    def crashing(method, url, headers, body, timeout):     # 생성 성공 직후 프로세스 중단 모사
+        if method == "POST":
+            return 201, {"id": "sess_9"}
+        raise Crash()
+    try:
+        run_turn(b, crashing, "c1", "m", "q", 100, sleep=lambda s: None)
+    except Crash:
+        pass
+    b2 = mk(tmp_path)                                         # 재시작: 파일에서 예산·예약 복원
+    assert "c1" in b2.s["reserved"] and b2.s["pending"]["c1"]["session_id"] == "sess_9"
+    held = b2.remaining()
+    assert held < b2.lim.budget_usd                           # 예약액이 잔여 예산에서 빠진 상태 유지
+    r = recover_pending(b2, Fake([(200, {"data": [turn("t1", "in_progress")]})]))
+    assert r[0]["action"] == "wait" and "c1" in b2.s["reserved"]
+    r = recover_pending(b2, Fake([(200, {"data": [turn("t1", "completed")]})]))
+    assert r[0]["action"] == "settled" and r[0]["basis"] == "usage"
+    assert abs(b2.report()["spent_usd"] - 0.002) < 1e-9 and not b2.s["reserved"] and not b2.s["pending"]
+
+
+def test_restart_before_session_id_settles_worst_only_after_stale(tmp_path):
+    t = [1_000_000.0]
+    b = Budget(str(tmp_path / "b.json"), "openai", Limits(1.0, 20, 10000, 50000), P, clock=lambda: t[0])
+    b.reserve("c1", "m", 100)                                 # 전송 전 중단
+    assert recover_pending(b, Fake([]))[0]["action"] == "wait"
+    t[0] += 4000
+    r = recover_pending(b, Fake([]))
+    assert r[0]["action"] == "settled_worst" and b.report()["spent_usd"] > 0
+
+
+def test_restart_no_turn_submitted_settles_zero_after_stale(tmp_path):
+    t = [1_000_000.0]
+    b = Budget(str(tmp_path / "b.json"), "openai", Limits(1.0, 20, 10000, 50000), P, clock=lambda: t[0])
+    b.reserve("c1", "m", 100)
+    b.note_pending("c1", session_id="sess_1", known_turns=["t0"])
+    t[0] += 4000
+    r = recover_pending(b, Fake([(200, {"data": [turn("t0", "completed")]})]))
+    assert r[0]["action"] == "settled_zero_no_turn" and b.report()["spent_usd"] == 0
+
+
+def test_duplicate_call_id_after_restart_is_blocked(tmp_path):
+    b = mk(tmp_path)
+    run_turn(b, Fake([(200, {"data": [turn("t1", "completed")]})], ITEMS), "c1", "m", "q", 100, sleep=lambda s: None)
+    b2 = mk(tmp_path)
+    r = run_turn(b2, Fake([]), "c1", "m", "q", 100)
+    assert "중복" in r["blocked"]
