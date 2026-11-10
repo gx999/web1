@@ -60,9 +60,13 @@ def source_pack(sources: list[dict]) -> str:
 
 def run_chain(job: dict, budget: Budget, http, fetch, save: Callable[[dict], None],
               write_text: Callable[[str, str], str], models: dict[str, str], clock=time.time,
-              turn_kwargs: dict | None = None) -> dict:
+              turn_kwargs: dict | None = None, guard: Callable[[], None] | None = None,
+              max_articles: int = 0) -> dict:
     """job: {"id", "question", "articles": [[law, art], ...], "steps": {}, "state"} — 제자리 갱신·저장."""
     steps: dict[str, Any] = job.setdefault("steps", {})
+    if max_articles and len(job["articles"]) > max_articles:
+        job["articles_dropped"] = job["articles"][max_articles:]
+        job["articles"] = job["articles"][:max_articles]
     kw = turn_kwargs or {}
 
     def iso():
@@ -100,6 +104,8 @@ def run_chain(job: dict, budget: Budget, http, fetch, save: Callable[[dict], Non
                 return {"status": "recovering", "call_id": cid}      # 복구(recover_pending) 뒤 다음 실행에서 판단
             if attempt >= STEP_MAX_ATTEMPTS:
                 return {"status": "failed", "error": "결과 유실 반복 — 시도 상한"}
+        if guard:
+            guard()                     # 유료 호출 직전: 관리자 잠금 갱신. 실패하면 LockLost로 중단(호출 안 함)
         attempt += 1
         cid = f"{job['id']}:{name}:a{attempt}"
         steps[name] = {"status": "started", "call_id": cid, "attempt": attempt, "at": iso(), "model": model}

@@ -45,6 +45,7 @@ class Limits:
     max_concurrency: int = 2
     max_retries: int = 1
     timeout_s: int = 120
+    max_calls_total: int = 0      # 이 원장 전체(시험 기간) 호출 상한. 0=없음. 재시도(새 시도 ID)도 1회로 셈
 
 
 class Budget:
@@ -95,6 +96,8 @@ class Budget:
             raise BudgetBlocked(f"도구 호출 상한 초과: {tool_calls}")
         if len(self.s["reserved"]) >= self.lim.max_concurrency:
             raise BudgetBlocked("동시 호출 상한 도달")
+        if self.lim.max_calls_total and len(self.s["calls"]) + len(self.s["reserved"]) >= self.lim.max_calls_total:
+            raise BudgetBlocked(f"시험 기간 총 호출 상한 도달: {self.lim.max_calls_total}")
         if self._calls_today() + len(self.s["reserved"]) >= self.lim.max_calls_per_day:
             raise BudgetBlocked("일일 호출 상한 도달")
         worst = self._cost(model, est_input_tokens, self.lim.max_output_tokens, tool_calls)

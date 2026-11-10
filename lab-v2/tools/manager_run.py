@@ -194,7 +194,9 @@ def cmd_summary(L: RepoLedger, args) -> dict:
                     {"spent_usd_internal": b["spent_usd"], "reserved": b["reserved"], "killed": b["killed"],
                      "calls": len(b["calls"]), "note": "내부 집계(토큰×공식 요금, 캐시 입력도 정가). 청구액 아님"},
                     "openai_gate": _openai_gate(L.root)[1]}
-    s["operations"] = {"manager_run": args.run or "unknown", "usage_signal": obs.get("usage_signal", "미확인"),
+    last_obs = ((_cfg(L.root) or {}).get("trigger_observations") or [None])[-1]
+    s["operations_trigger_last_observed"] = last_obs
+    s["operations"] = {"manager_run": args.run or "unknown", "last_ok_run_at": iso, "usage_signal": obs.get("usage_signal", "미확인"),
                        "is_using_overage": obs.get("is_using_overage"), "schedule": _cfg(L.root) or "없음",
                        "unattended_verified": prev.get("operations", {}).get("unattended_verified", False)}
     L.write_json("status/summary.json", s, f"status: summary {iso}")
@@ -264,8 +266,25 @@ def cmd_inbox(L: RepoLedger, args) -> dict:
     return {"observed_at": now, "migrated": migrated, "processed": res}
 
 
+GATE_DEFAULTS = {   # 24시간 시험 제안값(사용자 확인 후 ops/openai_gate.json에 기록)
+    "budget_file": "ops/budget_openai_agents.json", "budget_usd": None, "max_calls_total": 0,
+    "max_calls_per_day": None, "max_concurrency": None, "max_retries": None,
+    "max_jobs_total": 0, "require_test_directive": False, "max_articles": 0,
+    "window_start_epoch": None, "window_end_epoch": None}
+
+
+class LockLost(Exception):
+    """잠금 연장 실패 — 다른 관리자가 인수했을 수 있으므로 유료 호출을 하지 않고 중단."""
+
+
+def _gate_cfg(root: str) -> dict:
+    g = _read(root, "ops/openai_gate.json", {}) or {}
+    return {**GATE_DEFAULTS, **{k: v for k, v in g.items() if v is not None}}
+
+
 def _openai_gate(root: str) -> tuple[bool, str]:
-    """ops/openai_gate.json: 사용자 확인 항목이 모두 기록돼야 유료 호출 허용. 파일 자체가 없으면 차단."""
+    """ops/openai_gate.json: 사용자 확인 항목이 모두 기록돼야 유료 호출 허용. 파일 자체가 없으면 차단.
+    확인 항목 값은 사용자가 화면에서 본 값을 그대로 적는다(추정 금지)."""
     p = os.path.join(root, "ops", "openai_gate.json")
     if not os.path.exists(p):
         return False, "ops/openai_gate.json 없음 — 사용자 확인 전 OpenAI 호출 차단"
@@ -278,33 +297,73 @@ def _openai_gate(root: str) -> tuple[bool, str]:
     return True, "ok"
 
 
+def _limits(g: dict):
+    import dataclasses
+    from tools.agents_pilot import LIMITS
+    ch = {k: g[k] for k in ("max_calls_per_day", "max_concurrency", "max_retries") if g.get(k) is not None}
+    if g.get("budget_usd") is not None:
+        ch["budget_usd"] = float(g["budget_usd"])
+    if g.get("max_calls_total"):
+        ch["max_calls_total"] = int(g["max_calls_total"])
+    return dataclasses.replace(LIMITS, **ch)
+
+
 def cmd_run_openai(L: RepoLedger, args, http=None, fetch=None) -> dict:
+    """새 승인 지시나 재개할 작업이 있을 때만 OpenAI를 호출한다(없으면 호출 0회로 끝)."""
     from collectors.law_go_kr import urllib_fetch
     from collectors.retry import RetryingFetch
     from kernel.agents_pipeline import run_chain
     from kernel.budget import Budget
     from kernel.openai_agents import recover_pending, urllib_transport
-    from tools.agents_pilot import LIMITS, PRICES, DRAFT_MODEL, REVIEW_MODEL
+    from tools.agents_pilot import PRICES, DRAFT_MODEL, REVIEW_MODEL
     now = _iso(args)
+    now_s = _now(args)
     jobs = _jobs(L.root)
     store = dv.DirectiveStore(L.root, L.write_json)
+    g = _gate_cfg(L.root)
     ok, why = _openai_gate(L.root) if http is None else (True, "mock transport")
+    if ok and g.get("window_end_epoch") and now_s >= g["window_end_epoch"]:
+        ok, why = False, "시험 기간 종료 — 새 호출 없음(미정산 호출 복구만)"
+    if ok and g.get("window_start_epoch") and now_s < g["window_start_epoch"]:
+        ok, why = False, "시험 기간 시작 전"
     ran = []
+    budget = Budget(os.path.join(L.root, g["budget_file"]), "openai", _limits(g), PRICES,
+                    clock=(lambda: _now(args)) if args.now else time.time)
+    recovered = []
+    if budget.s.get("pending") and (ok or "종료" in why):       # 결과 불확실 호출: 상태부터 확인(재호출 아님)
+        recovered = recover_pending(budget, http or urllib_transport)
+
+    def hold(j, jid, reason):
+        if j.get("state_reason") != reason:
+            j["state_reason"], j["updated_at"] = reason, now
+            L.write_json(f"ledger/jobs/{jid}.json", j, f"job: {jid} held")
     if not ok:
         for jid, j in jobs.items():
-            if j.get("state") in ("accepted", "running") and j.get("state_reason") != why:
-                j["state_reason"], j["updated_at"] = why, now
-                L.write_json(f"ledger/jobs/{jid}.json", j, f"job: {jid} gated")
+            if j.get("state") in ("accepted", "running"):
+                hold(j, jid, why)
         dv.refresh(store, L, _jobs(L.root), now)
-        return {"ran": [], "gate": why}
+        return {"ran": [], "gate": why, "recovered": recovered, "openai_calls": 0}
     http = http or urllib_transport
-    budget = Budget(os.path.join(L.root, "ops", "budget_openai_agents.json"), "openai", LIMITS, PRICES)
-    recovered = recover_pending(budget, http)
+    run_owner = getattr(args, "run", None)
+
+    def guard():
+        if run_owner and not L.renew_lock(run_owner, _now(args) if args.now else time.time()):
+            raise LockLost(f"잠금 연장 실패({run_owner}) — 호출 중단")
+    started = sum(1 for j in jobs.values() if j.get("steps", {}).get("draft"))
+    calls_before = len(budget.s["calls"])
     for jid, j in jobs.items():
         if j.get("state") not in ("accepted", "running"):
             continue
         if len(ran) >= int(args.max_jobs or 1):
             break
+        d = store.get(j.get("directive_id", "")) or {}
+        if g.get("require_test_directive") and not d.get("test"):
+            hold(j, jid, "24시간 시험: 시험 표시 지시만 실행")
+            continue
+        fresh = not j.get("steps", {}).get("draft")
+        if fresh and g.get("max_jobs_total") and started >= int(g["max_jobs_total"]):
+            hold(j, jid, f"시험 작업 수 상한({g['max_jobs_total']}) — 실행 안 함")
+            continue
         out_dir = os.path.join("jobs", jid)
 
         def save(job, jid=jid):
@@ -319,16 +378,44 @@ def cmd_run_openai(L: RepoLedger, args, http=None, fetch=None) -> dict:
             L._commit_push([rel], f"job {jid}: {name}")
             return rel
         j["state"] = "running"
+        started += int(fresh)
         try:
             run_chain(j, budget, http, fetch or RetryingFetch(urllib_fetch), save, write_text,
                       {"draft": DRAFT_MODEL, "review": REVIEW_MODEL}, clock=lambda: _now(args) if args.now else time.time(),
-                      turn_kwargs={"sleep": (lambda s: None) if args.now else time.sleep})
+                      turn_kwargs={"sleep": (lambda s: None) if args.now else time.sleep}, guard=guard,
+                      max_articles=int(g.get("max_articles") or 0))
+        except LockLost as e:
+            j["state_reason"] = str(e)
+            ran.append({"job": jid, "state": j.get("state"), "reason": str(e)})
+            break                                   # 잠금을 잃으면 이번 실행의 나머지 작업도 중단
         except Exception as exc:  # noqa: BLE001 — 한 작업의 실패가 다른 작업을 막지 않게
             j["state"], j["state_reason"] = "failed", f"program_error: {str(exc)[:200]}"
             save(j)
         ran.append({"job": jid, "state": j["state"], "reason": j.get("state_reason", "")})
     dv.refresh(store, L, _jobs(L.root), now)
-    return {"ran": ran, "recovered": recovered, "budget": budget.report()}
+    return {"ran": ran, "recovered": recovered, "budget": budget.report(),
+            "openai_calls": len(budget.s["calls"]) - calls_before}
+
+
+def cmd_schedule_record(L: RepoLedger, args) -> dict:
+    """관리자 세션이 get_trigger 결과(JSON 파일)를 넘기면 예약의 실제 상태를 기록한다.
+    예약 존재·활성 여부는 '연구가 됐는가'와 별개로 기록한다."""
+    t = json.load(open(args.trigger_json, encoding="utf-8"))
+    t = t.get("trigger", t)
+    cfg = _cfg(L.root) or {}
+    obs = {"observed_at": _iso(args), "enabled": t.get("enabled"), "next_run_at": t.get("next_run_at"),
+           "cron_expression": t.get("cron_expression"), "ended_reason": t.get("ended_reason"),
+           "last_run": t.get("last_run"), "trigger_id": t.get("id")}
+    cfg.setdefault("trigger_observations", []).append(obs)
+    cfg["trigger_observations"] = cfg["trigger_observations"][-48:]
+    expired = bool(cfg.get("end_at_epoch")) and _now(args) >= cfg["end_at_epoch"]
+    if expired:
+        cfg["end_verified"] = obs["enabled"] is False
+        if obs["enabled"] is not False:
+            cfg["end_problem"] = f"{obs['observed_at']} 종료 시각 이후에도 enabled={obs['enabled']} — 자동 재개 없이 보고 필요"
+    L.write_json("ops/schedule.json", cfg, f"schedule: observed enabled={obs['enabled']}")
+    L.record(f"trigger-obs:{obs['observed_at']}", type="trigger_observed", **{k: obs[k] for k in ("enabled", "next_run_at")})
+    return {"recorded": obs, "end_verified": cfg.get("end_verified")}
 
 
 def cmd_lock(L: RepoLedger, args) -> dict:
@@ -364,7 +451,8 @@ web1 저장소의 규칙 문서(lab-v2/prompts/common-rules.md, stages.md의 {st
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["plan-observe", "tick", "adopt", "summary", "prompt", "inbox", "run-openai", "lock", "unlock"])
+    ap.add_argument("cmd", choices=["plan-observe", "tick", "adopt", "summary", "prompt", "inbox", "run-openai", "lock", "unlock", "schedule-record"])
+    ap.add_argument("--trigger-json")
     ap.add_argument("--rows")
     ap.add_argument("--max-jobs")
     ap.add_argument("--repo", required=True)
@@ -384,7 +472,8 @@ def main() -> None:
     else:
         out = {"plan-observe": cmd_plan_observe, "tick": cmd_tick, "adopt": cmd_adopt,
                "summary": cmd_summary, "inbox": cmd_inbox, "run-openai": cmd_run_openai,
-               "lock": cmd_lock, "unlock": cmd_unlock}[a.cmd](L, a)
+               "lock": cmd_lock, "unlock": cmd_unlock,
+               "schedule-record": cmd_schedule_record}[a.cmd](L, a)
     print(json.dumps(out, ensure_ascii=False, indent=1))
 
 

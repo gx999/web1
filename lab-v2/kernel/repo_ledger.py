@@ -166,6 +166,28 @@ class RepoLedger:
             return False, json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
         return True, lock
 
+    def renew_lock(self, owner: str, now: float, ttl: float = 50 * 60, rel: str = "ops/manager_lock.json") -> bool:
+        """잠금 연장. 원격 기준으로 내가 아직 주인이고 해제·만료 전일 때만, 푸시가 성공해야 True.
+        만료 뒤 다른 실행이 인수했을 수 있으므로 만료된 잠금은 연장하지 않는다(호출 중단)."""
+        try:
+            self.sync()
+        except Exception:  # noqa: BLE001
+            return False
+        p = os.path.join(self.root, rel)
+        cur = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else None
+        if not cur or cur.get("owner") != owner or cur.get("released_at") is not None or now >= cur.get("expires_at", 0):
+            return False
+        cur["expires_at"], cur["renewed_at"] = now + ttl, now
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(cur, f, ensure_ascii=False, indent=1)
+        self._git("add", "--", rel)
+        self._git("-c", f"user.name={self.author}", "-c", f"user.email={self.email}", "commit", "-q", "-m",
+                  f"lock renew: {owner}")
+        if self._git("push", "-q", "origin", f"HEAD:{self.branch}", check=False).returncode != 0:
+            # 되돌리지 않는다: 이 실행이 이미 정산한 호출·완료 단계 기록이 로컬에 남아 있어야 사람이 대조할 수 있음
+            return False
+        return True        # 연장과 함께 이전 단계 결과도 원격에 올라감 → 인수한 실행이 완료 단계를 반복하지 않음
+
     def release_lock(self, owner: str, now: float, rel: str = "ops/manager_lock.json") -> None:
         p = os.path.join(self.root, rel)
         if not os.path.exists(p):

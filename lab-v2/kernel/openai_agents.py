@@ -84,7 +84,7 @@ def run_turn(budget: Budget, http: Transport, call_id: str, model: str, text: st
     known: set[str] = set()
     if session_id is None:
         body = {"agent": agent_config(model, instructions), "environment": {"type": "none"},
-                "input": msg, "metadata": metadata or {}}
+                "input": msg, "metadata": {**(metadata or {}), "call": call_id[:64]}}
         st, data = _send(http, "POST", f"{API}/agents/sessions", _headers(call_id), body, t, budget.lim.max_retries)
         if not 200 <= st < 300:
             return _fail(budget, call_id, model, session_id, _err(st, data), charged_worst=st not in (400, 401, 403, 404, 422))
@@ -193,6 +193,15 @@ def recover_pending(budget: Budget, http: Transport, stale_s: int = 3600) -> lis
     now = budget.now()
     for cid, meta in list(budget.s.get("pending", {}).items()):
         model, sid, age = meta["model"], meta.get("session_id"), now - meta.get("reserved_at", now)
+        if not sid:     # 생성 응답을 못 받음 → 재시도·정산 전에 실제로 만들어졌는지 먼저 조회
+            st, data = _send(http, "GET", f"{API}/agents/sessions?limit=50&order=desc", _headers(), None,
+                             budget.lim.timeout_s, budget.lim.max_retries)
+            hit = [x for x in data.get("data", []) if (x.get("metadata") or {}).get("call") == cid[:64]] \
+                if 200 <= st < 300 else []
+            if hit:
+                sid = hit[0]["id"]
+                budget.note_pending(cid, session_id=sid, known_turns=[], stage="found_by_metadata")
+                meta = budget.s["pending"][cid]
         if not sid:
             if age > stale_s:
                 c = budget.settle(cid, model, None, error="재시작 복구: 세션 생성 응답 미확인 — 최악값 정산")
