@@ -35,6 +35,22 @@ SAFE = re.compile(r"[^0-9A-Za-z가-힣._-]")
 END = {"done", "failed", "blocked", "needs_owner", "rejected", "answered"}
 
 
+_MD_ESC = re.compile(r"\\([\\_*`\[\]()#+\-.!|~>{}])")
+_BR = re.compile(r"<br\s*/?>", re.I)
+
+
+def normalize_row(row: dict) -> dict:
+    """Notion 조회(rows 모드)는 텍스트를 마크다운으로 준다: 밑줄 앞 역슬래시(openai\\_chain), 줄바꿈 <br />.
+    실측(2026-11-10 T24-1 행)에 맞춰 원래 글자로 되돌린다. 숫자·체크박스 등은 그대로."""
+    import html as _html
+    out = {}
+    for k, v in row.items():
+        if isinstance(v, str) and k != "url":
+            v = _html.unescape(_MD_ESC.sub(r"\1", _BR.sub("\n", v)))
+        out[k] = v
+    return out
+
+
 def content_sha(row: dict) -> str:
     keys = ("요청ID", "종류", "내용", "대상", "우선순위", "시험")
     return hashlib.sha256(json.dumps({k: row.get(k) for k in keys}, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -101,7 +117,7 @@ def intake(rows: list[dict], store: DirectiveStore, ledger, approved_scopes: lis
     """Notion 행 목록(조회 결과 그대로) → 지시 기록. 반환: 행별 처리 결과."""
     out = []
     by_row = {d["notion_row"]: d for d in store.all()}
-    for row in rows:
+    for row in (normalize_row(r) for r in rows):
         rid, did, h = row_id(row), (row.get("요청ID") or "").strip(), content_sha(row)
         prev = by_row.get(rid)
         if prev:

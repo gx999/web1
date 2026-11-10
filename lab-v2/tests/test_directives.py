@@ -267,3 +267,17 @@ def test_legacy_inbox_seen_row_is_migrated_not_reprocessed(L, tmp_path):
     assert r["migrated"] == ["r9"] and r["processed"][0]["result"] == "duplicate"
     x = d(L, "I-0-시험")
     assert x["state"] == "answered" and "이관" in x["history"][0]["reason"] and len(x["history"]) == 1
+
+
+def test_real_notion_markdown_row_is_normalized(L, tmp_path):
+    """실측 행 모양(2026-11-10 T24-1): 대상 'openai\\_chain', 내용 줄바꿈 '<br />'."""
+    gate(L)
+    r = {"url": "https://app.notion.com/p/414f568334ca81a0919de0f739ed2c66", "요청ID": "T24-1", "종류": "new_task",
+         "대상": "openai\\_chain", "시험": "__YES__", "작성자": "지피", "우선순위": None,
+         "내용": "침해사고 신고·통지 의무 비교(시험)<br />조문: 개인정보 보호법 제34조; "
+                 "정보통신망 이용촉진 및 정보보호 등에 관한 법률 제48조의3"}
+    out = inbox(L, tmp_path, [r])
+    assert out["processed"][0]["result"] == "accepted"
+    j = mr._jobs(L.root)["J-T24-1"]
+    assert j["articles"] == [["개인정보 보호법", "제34조"], ["정보통신망 이용촉진 및 정보보호 등에 관한 법률", "제48조의3"]]
+    assert inbox(L, tmp_path, [r])["processed"][0]["result"] == "duplicate"     # 같은 원 행 재조회 → 중복
