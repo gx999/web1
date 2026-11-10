@@ -36,3 +36,27 @@ lab-v2 코드 수정, 기존 v1 연구소·P1 기록 변경. 의심되면 아무
 2. get_trigger 결과를 /tmp/t.json에 저장 → web1 lab-v2의 manager_run.py schedule-record 로 기록 → 푸시.
 3. enabled가 false가 아니면 다시 켜거나 지우지 말고, 마지막 답변 첫 줄에 '종료 실패'와 응답을 적으세요(사용자 보고용).
 ```
+
+## C. 사용자가 claude.ai 예약 화면에서 만드는 무인 리허설(1회) — 2026-11-10
+도구(create_trigger)로 만든 예약에는 저장소·커넥터·원격 도구가 붙지 않음(실측). 화면에서 환경 `web1 연구소 v2`, 저장소 web1·daeyong-lab, 커넥터 Notion을 선택해 만든다.
+```
+정대용 디지털 연구소 v2 '무인 예약 리허설 2차'(1회용 기술 시험, 연구 아님). 사용자가 승인한 실행입니다.
+금지: Notion 쓰기, 예약 생성·변경, add_repo 등 권한 추가, 권한 설정 변경, 코드 수정, 키·토큰 출력, 외부 연락, 공개 게시,
+유료 OpenAI 호출(게이트 파일이 없어 코드가 자동 차단해야 정상). 막히면 우회하지 말고 기록만 하세요.
+
+1. 환경 기록: `ls /home/user`, `date -u`. 사용 가능한 도구 중 Notion 도구와 mcp__claude-code-remote__ 도구가 있는지 기록.
+   mcp__claude-code-remote__get_session 이 있으면 호출해 session_id·sources·rate_limit_info(isUsingOverage) 기록
+   (isUsingOverage=true면 4~7을 하지 말고 8로). 없으면 RUN=run-$(date -u +%Y%m%dT%H%M%SZ) 를 실행 ID로 사용.
+2. 원장 D=/home/user/daeyong-lab (없으면 `git ls-remote https://github.com/gx999/daeyong-lab HEAD` 오류 앞 120자 기록 후 8로)
+   코드: `git -C /home/user/web1 fetch -q origin claude/sharp-brown-8lieqe && git -C /home/user/web1 worktree add /tmp/w 66c49e8`
+   cd /tmp/w/lab-v2 ; M="python tools/manager_run.py --repo $D"
+3. `$M lock --run $RUN` (acquired=false면 8로)
+4. `$M plan-observe`
+5. Notion 도구가 있으면 query-data-sources(rows 모드, data_source_url "collection://6ffdf2a6-8193-4c47-8e71-6a1d6eed55db", limit 100)
+   결과 JSON을 /tmp/rows.json에 저장 → `$M inbox --rows /tmp/rows.json`. 없거나 승인 필요하면 실패로 기록.
+6. `$M run-openai --run $RUN --max-jobs 1` (gate 문구, openai_calls 기록)
+7. `$M summary --run $RUN` → `$M unlock --run $RUN`
+8. 결과 표(단계, 성공/실패/거부, 근거 한 줄 — 권한 검사 거부면 문구 앞 150자)를
+   $D/tests/probes/rehearsal2-$RUN.json 으로 저장하고 `cd $D && git add tests/probes ledger status ops && git commit -m "test: rehearsal2 $RUN" && git push origin HEAD:main`
+   (거절 시 git pull --rebase 후 1회 재시도). 같은 표를 최종 답변에도 쓰세요.
+```
