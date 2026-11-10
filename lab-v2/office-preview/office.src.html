@@ -30,7 +30,7 @@ header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end; justi
 h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(22px, 3.4vw, 32px); margin: 0; letter-spacing: .01em }
 .sub { color: var(--ink-soft); font-size: 14px; margin-top: 2px }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
-.clock { font-family: var(--font-display); font-size: 20px; font-variant-numeric: tabular-nums; min-width: 8.5em }
+.clock { font-family: var(--font-display); font-size: 19px; font-variant-numeric: tabular-nums }
 button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
   border-radius: 999px; padding: 6px 12px; cursor: pointer }
 button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
@@ -44,6 +44,14 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
 #mini { position: absolute; right: 8px; top: 8px; width: min(26%, 230px); height: auto; border: 2px solid #3b3128; border-radius: 6px; background: #2a241e; opacity: .92; cursor: pointer; image-rendering: pixelated }
 @media (max-width: 600px) { #mini { display: none } }
 .rooms { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+@media (max-width: 600px) {
+  .rooms { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none }
+  .rooms button, .controls button, .people button { min-height: 38px; flex: 0 0 auto }
+  .controls { width: 100% } .clock { min-width: 0; width: 100% }
+  .legend { font-size: 12px } .log { max-height: 260px } .stage { border-width: 2px; border-radius: 8px }
+  .bubble { max-width: 62% }
+}
+.hint { font-size: 12.5px; color: var(--ink-soft) }
 .rooms button { font-size: 13px; padding: 4px 10px }
 .follow { font-family: var(--font-display); font-size: 15px; margin-right: 6px }
 .bubble { position: absolute; transform: translate(-50%, -100%); max-width: min(230px, 46%); background: #fffdf7; color: #2f2a24;
@@ -94,6 +102,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
       <button id="sp240" aria-pressed="false">240배</button>
       <button id="pause" aria-pressed="false">멈춤</button>
       <button id="replay">실제 기록 재생 · T24-1</button>
+      <button id="ot" aria-pressed="false">야근 장면 보기</button>
     </div>
   </header>
   <div class="legend">
@@ -102,7 +111,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
     <span class="chip"><span class="dot" style="background:var(--accent)"></span>관계는 이 브라우저에서만 쌓입니다</span>
   </div>
   <div class="rooms" role="group" aria-label="방 바로가기">
-    <span class="follow" id="follow">따라가는 중: 미나</span>
+    <span class="follow" id="follow">따라가는 중: 미나</span><span class="hint">· 화면을 끌면 둘러볼 수 있어요</span>
     <button data-room="1">자료실</button><button data-room="2">회의실</button><button data-room="3">카페 라운지</button>
     <button data-room="4">연구실</button><button data-room="5">옥상 정원</button><button data-room="6">숙소</button>
   </div>
@@ -151,15 +160,15 @@ function load(k) { return new Promise(r => { const i = new Image(); i.onload = (
 // ---------------------------------------------------------------- 사람들 (홈페이지 v1 설정 그대로)
 const PEOPLE = [
   { id: 'lead', name: '지피', role: '연구팀장', sprite: 'char_3', color: '#b39b62', trait: '차분하게 이야기를 잇는 성격', likes: ['오래된 책', '산책'],
-    fav: { read: 1.4, stroll: 1.5, outwalk: 1.6, chat: 1.0, coffee: 1.0, plants: 1.1, nap: 0.8, cat: 0.9, board: 1.2 }, wake: 6.5, sleep: 23.0 },
+    fav: { read: 1.4, stroll: 1.5, outwalk: 1.6, chat: 1.0, coffee: 1.0, plants: 1.1, nap: 0.8, cat: 0.9, board: 1.2 }, wake: 6.5, sleep: 23.0, home: 'commute', arrive: 8.6, leave: 18.4 },
   { id: 'research', name: '미나', role: '자료 조사', sprite: 'char_0', color: '#6e9578', trait: '호기심 많고 먼저 말을 거는 성격', likes: ['독서', '새로운 질문'],
-    fav: { read: 1.5, chat: 1.5, coffee: 1.1, cat: 1.2, stroll: 1.0, board: 1.1, plants: 0.9, nap: 0.7, outwalk: 0.8 }, wake: 6.0, sleep: 22.5 },
+    fav: { read: 1.5, chat: 1.5, coffee: 1.1, cat: 1.2, stroll: 1.0, board: 1.1, plants: 0.9, nap: 0.7, outwalk: 0.8 }, wake: 6.0, sleep: 22.5, home: 'dorm' },
   { id: 'writer', name: '솔', role: '논증 집필', sprite: 'char_2', color: '#bd8c67', trait: '다정하고 표현을 즐기는 성격', likes: ['메모', '짧은 글'],
-    fav: { chat: 1.4, coffee: 1.3, plants: 1.3, read: 1.0, cat: 1.3, nap: 0.9, stroll: 1.1, board: 1.0, outwalk: 0.8 }, wake: 7.0, sleep: 23.5 },
+    fav: { chat: 1.4, coffee: 1.3, plants: 1.3, read: 1.0, cat: 1.3, nap: 0.9, stroll: 1.1, board: 1.0, outwalk: 0.8 }, wake: 7.0, sleep: 23.5, home: 'commute', arrive: 9.0, leave: 18.2 },
   { id: 'reviewer', name: '클로', role: '독립 검증', sprite: 'char_5', color: '#8c86a6', trait: '신중하지만 동료를 챙기는 성격', likes: ['다른 관점', '조용한 휴식'],
-    fav: { read: 1.3, nap: 1.3, coffee: 1.2, plants: 1.1, chat: 0.9, cat: 1.1, stroll: 1.1, board: 0.9, outwalk: 0.9 }, wake: 7.0, sleep: 23.0 },
+    fav: { read: 1.3, nap: 1.3, coffee: 1.2, plants: 1.1, chat: 0.9, cat: 1.1, stroll: 1.1, board: 0.9, outwalk: 0.9 }, wake: 7.0, sleep: 23.0, home: 'commute', arrive: 8.8, leave: 18.7 },
   { id: 'experiment', name: '코디', role: '실험 재현', sprite: 'char_1', color: '#7d9caa', trait: '장난기 있고 함께 해보길 좋아하는 성격', likes: ['작은 만들기', '아이디어'],
-    fav: { board: 1.6, cat: 1.5, chat: 1.3, coffee: 1.0, stroll: 1.0, plants: 0.8, read: 0.8, nap: 0.9, outwalk: 0.9 }, wake: 8.0, sleep: 25.0 },
+    fav: { board: 1.6, cat: 1.5, chat: 1.3, coffee: 1.0, stroll: 1.0, plants: 0.8, read: 0.8, nap: 0.9, outwalk: 0.9 }, wake: 8.0, sleep: 25.0, home: 'dorm' },
 ];
 const byId = Object.fromEntries(PEOPLE.map(p => [p.id, p]));
 // 처음 친밀도(0~100). 70 이상이면 설렘이 생길 수 있는 짝(romance)만 연애 장면으로 이어진다.
@@ -213,18 +222,19 @@ const beds = [];
 function buildMap() {
   // 연구실: 책상 다섯(사람은 책상 뒤에 앉아 화면 쪽을 봄)
   for (const [owner, c, r] of DESKS) {
-    put('CUSHIONED_CHAIR_FRONT', c + 1, r - 1, { z: (r - 1) * T + 2 });
+    // v1 방식: 모니터 화면이 이쪽을 보고, 사람은 책상 앞 의자에 앉아 화면을 봄(작업 중이면 화면이 빛남)
     put('DESK_FRONT', c, r, { bg: 0 });
-    put('PC_SIDE', c, r - 1, { z: r * T + 33, frames: null });
-    spot('desk-' + owner, c + 1, r - 1, 'down', 'type', ['desk'], { owner, dy: 2 });
-    grid[r - 1][c + 1].block = false;
+    items.push({ k: 'PC_FRONT_OFF', pc: owner, x: (c + 1) * T, y: r * T - 12, w: 16, h: 32, z: r * T + 33 });
+    put('POT', c, r, { z: r * T + 34, dy: -6 }); grid[r][c].block = true;
+    put('CUSHIONED_CHAIR_BACK', c + 1, r + 2, { z: (r + 2) * T + 17, dy: -6 });
+    spot('desk-' + owner, c + 1, r + 2, 'up', 'type', ['desk'], { owner, dy: -9 });
+    grid[r + 2][c + 1].block = false;
   }
   put('WHITEBOARD', 24, 14, { wall: true, z: 14 * T });
   spot('status-board', 24, 16, 'up', 'stand', ['statusboard']);
   put('BOOKSHELF', 27, 14, { wall: true, z: 14 * T });
-  put('CLOCK', 20, 14, { wall: true, z: 14 * T });
   put('LARGE_PLANT', 28, 25); put('PLANT', 1, 14); put('BIN', 22, 18); put('PLANT_2', 20, 26); put('CACTUS', 1, 26);
-  put('SMALL_PAINTING', 9, 14, { wall: true, z: 14 * T }); put('SMALL_PAINTING_2', 12, 14, { wall: true, z: 14 * T });
+  put('PLANT_2', 9, 14); put('BIN', 13, 15);
   // 자료실
   [2, 4, 6, 9, 11].forEach((c, i) => { put(i % 2 ? 'BOOKSHELF' : 'DOUBLE_BOOKSHELF', c, 2, { wall: true, z: 2 * T }); });
   for (const c of [3, 5, 7, 10, 12]) spot('shelf-' + c, c, 4, 'up', 'read', ['shelf']);
@@ -295,36 +305,129 @@ const hourNow = () => kst(worldMs).h;
 const simRate = () => (speed === 1 ? 1 : speed === 30 ? 2.2 : 3.2);
 
 // ---------------------------------------------------------------- 대사
+// 공통 대사(누구나) — 장소·상황별
 const L = {
-  greetMorning: ['좋은 아침이에요!', '잘 잤어요?', '오늘 하늘 맑네요.', '커피 냄새 좋다~'],
-  greetNight: ['아직 안 잤어요?', '오늘도 고생 많았어요.', '밤공기 시원하네요.'],
-  coffee: ['라떼 아트 연습 중이에요 ☕', '오늘은 디카페인으로.', '이 원두 산미가 좋네요.', '한 잔 더 마실까 고민 중…'],
-  books: ['이 책 문장이 참 좋아요.', '오래된 판본 냄새가 나요.', '책갈피 어디 뒀더라…', '다 읽으면 빌려줄게요.'],
-  garden: ['꽃이 하나 더 폈어요!', '바람이 딱 좋아요.', '저 구름 고양이 같지 않아요?', '물 주니까 잎이 반짝여요.'],
-  cat: ['냥이야 여기 와~', '골골송 들린다…', '오늘도 털이 보송보송.', '간식은 하루 하나!'],
-  board: ['이렇게 그리면 더 귀엽죠?', '아이디어 하나 떠올랐어요!', '화살표가 너무 많나…', '(낙서 중) 🐱'],
-  ask: ['요즘 뭐 읽어요?', '주말에 뭐 했어요?', '점심 뭐 먹을까요?', '그 노래 제목 알아요?', '산책 같이 갈래요?'],
-  answer: ['저는 짧은 에세이요.', '공원 한 바퀴 돌았어요.', '김밥 어때요?', '아, 그거 저도 좋아해요!', '좋아요, 이따가요!'],
-  laugh: ['ㅎㅎ 맞아요.', '하하, 그거 웃기다.', '정말요? 신기하다!', '오 좋은데요?'],
-  tired: ['조금 졸려요…', '눈이 감겨요.', '잠깐만 쉬어야겠다.'],
-  lunch: ['점심 먹으러 가요!', '오늘 메뉴는 뭐예요?', '밥 먹고 산책해요.'],
-  tea: ['3시 티타임이에요 🍪', '쿠키 하나씩 가져가요!', '오늘 차는 보리차래요.'],
-  goodnight: ['잘 자요~', '내일 봐요.', '오늘도 수고했어요.'],
-  outwalk: ['동네 한 바퀴 다녀올게요.', '서점 들렀다 올게요.'],
-  back: ['다녀왔어요!', '바깥 날씨 좋더라고요.'],
-  crush: ['(…괜히 눈이 마주쳤네)', '(오늘따라 웃는 게 예쁘다)', '(말 걸어볼까…)'],
-  confess: ['저기… 노을 같이 볼래요?', '사실 계속 말하고 싶었어요.'],
-  confessYes: ['…좋아요. 저도요.', '네! 기다렸어요.'],
-  couple: ['오늘 하루 어땠어요?', '같이 있으니까 좋다.', '이따 산책 갈래요?', '커피 내가 살게요 ☕', '노을 진짜 예쁘다…'],
-  gift: ['이거 마셔요, 따뜻해요.', '수고했어요, 커피 한 잔!'],
-  thanks: ['고마워요!', '헤헤, 잘 마실게요.'],
+  greetMorning: ['좋은 아침이에요!', '잘 잤어요?', '오늘 하늘 맑네요 ☀', '커피 냄새 좋다~', '으아, 아직 눈이 반만 떠져요.', '아침 햇살 따뜻하다~', '머리 까치집 됐어요…', '굿모닝 🌼'],
+  greetNight: ['아직 안 잤어요?', '오늘도 고생 많았어요.', '밤공기 시원하네요.', '별 보여요! ✨', '야식 생각나는 시간…', '조용해서 좋다~'],
+  coffee: ['라떼 아트 연습 중 ☕', '오늘은 디카페인으로.', '이 원두 산미가 좋네요.', '한 잔 더 마실까 고민 중…', '하트 모양이 찌그러졌어요 ㅠ', '우유 거품 몽글몽글~', '시럽은 반 펌프만!', '머그컵 귀엽죠? 고양이 그림이에요.', '아이스로 할까, 따뜻한 걸로 할까…'],
+  books: ['이 책 문장이 참 좋아요.', '오래된 판본 냄새가 나요.', '책갈피 어디 뒀더라…', '다 읽으면 빌려줄게요.', '밑줄 긋고 싶은데 도서관 책이라 참는 중.', '이 시리즈 다음 권 어디 있지?', '표지가 너무 예뻐서 골랐어요.', '한 장만 더… 한 장만 더…'],
+  garden: ['꽃이 하나 더 폈어요!', '바람이 딱 좋아요.', '저 구름 고양이 같지 않아요?', '물 주니까 잎이 반짝여요.', '새싹 났어요! 쪼끄매요.', '나비가 왔다 갔어요 🦋', '흙냄새 좋다~', '선인장한테 이름 지어 줬어요.'],
+  cat: ['냥이야 여기 와~', '골골송 들린다…', '오늘도 털이 보송보송.', '간식은 하루 하나!', '꾹꾹이 해 주는 거야?', '발바닥 젤리 말랑말랑…', '어, 내 의자에서 자고 있었구나.', '하품하는 거 봤어요? 너무 귀여워.'],
+  board: ['이렇게 그리면 더 귀엽죠?', '아이디어 하나 떠올랐어요!', '화살표가 너무 많나…', '(낙서 중) 고양이 얼굴 완성!', '보드마커 또 말랐어…', '오늘의 할 일: 커피, 산책, 웃기.', '동그라미 하나 그리고 뿌듯.'],
+  ask: ['요즘 뭐 읽어요?', '주말에 뭐 했어요?', '점심 뭐 먹을까요?', '그 노래 제목 알아요?', '산책 같이 갈래요?', '오늘 기분 몇 점이에요?', '어제 꿈 꿨어요?', '최애 간식 뭐예요?', '고양이파예요, 강아지파예요?'],
+  answer: ['저는 짧은 에세이요.', '공원 한 바퀴 돌았어요.', '김밥 어때요?', '아, 그거 저도 좋아해요!', '좋아요, 이따가요!', '오늘은 85점! 커피 마시면 90점.', '하늘 나는 꿈 꿨어요!', '붕어빵이요, 팥으로.', '둘 다요! 고를 수 없어요.'],
+  laugh: ['ㅎㅎ 맞아요.', '하하, 그거 웃기다.', '정말요? 신기하다!', '오 좋은데요?', '헉, 저도요!', '푸흡, 상상했어요.', '역시 그쵸?', '와 그거 완전 공감.'],
+  tired: ['조금 졸려요…', '눈이 감겨요.', '잠깐만 쉬어야겠다.', '소파가 저를 부르네요…', '5분만… 진짜 5분만…', '하암~'],
+  lunch: ['점심 먹으러 가요!', '오늘 메뉴는 뭐예요?', '밥 먹고 산책해요.', '배꼽시계 울렸어요.', '오늘은 따끈한 국물이 당겨요.', '디저트 배는 따로 있어요!'],
+  tea: ['3시 티타임이에요 🍪', '쿠키 하나씩 가져가요!', '오늘 차는 보리차래요.', '마들렌 구워 왔어요!', '찻잔 따뜻하다~', '간식 나눠 먹으니 더 맛있어요.'],
+  goodnight: ['잘 자요~', '내일 봐요.', '오늘도 수고했어요.', '좋은 꿈 꿔요 🌙', '이불 덮고 자요!', '내일 아침에 커피 같이 마셔요.'],
+  outwalk: ['동네 한 바퀴 다녀올게요.', '서점 들렀다 올게요.', '바람 쐬고 올게요~', '빵집 신상 보러 가요.'],
+  back: ['다녀왔어요!', '바깥 날씨 좋더라고요.', '붕어빵 사 왔어요, 하나씩!', '공원에 강아지가 많았어요.'],
+  crush: ['(…괜히 눈이 마주쳤네)', '(오늘따라 웃는 게 예쁘다)', '(말 걸어볼까…)', '(심장이 왜 이러지…)', '(커피 한 잔 사 줄까…)'],
+  confess: ['저기… 노을 같이 볼래요?', '사실 계속 말하고 싶었어요.', '같이 있으면 하루가 반짝여요.', '저… 좋아해요.'],
+  confessYes: ['…좋아요. 저도요.', '네! 기다렸어요.', '저도 같은 마음이었어요.', '헤헤… 좋아요.'],
+  couple: ['오늘 하루 어땠어요?', '같이 있으니까 좋다.', '이따 산책 갈래요?', '커피 내가 살게요 ☕', '노을 진짜 예쁘다…', '손 시리죠? 주머니에 넣어요.', '내일도 같이 점심 먹어요.', '오늘 머리 예쁘네요.', '보고 싶었어요.'],
+  gift: ['이거 마셔요, 따뜻해요.', '수고했어요, 커피 한 잔!', '당 충전하세요 🍫', '이거 좋아하죠? 사 왔어요.'],
+  thanks: ['고마워요!', '헤헤, 잘 마실게요.', '감동이에요…', '역시 최고!', '마침 마시고 싶었어요!'],
+  hello: ['안녕하세요!', '네?', '헤헤', '오늘도 좋은 하루!', '(손 흔들기)', '앗, 들켰다!', '저 불렀어요?', '간지러워요~'],
+  rain: ['비 오는 소리 좋다…', '우산 챙겼어요?'],
+  arrive: ['출근했어요! 좋은 아침~', '지하철에서 고양이 영상 봤어요 ㅎㅎ', '오늘도 힘내 봐요!', '출근 도장 쾅!', '빵 사 왔어요, 하나씩 드세요!'],
+  visit: ['주말인데 놀러 왔어요~', '집에 있으니 심심해서요 ㅎㅎ', '고양이들 보고 싶어서 왔어요!'],
+  leave: ['퇴근! 내일 봐요~', '먼저 들어갈게요, 수고했어요!', '오늘 저녁은 떡볶이다!', '집에 가는 길 노을 예쁘겠다.'],
+  work: ['집중 모드 🔥', '타닥타닥…', '메모 정리하는 중.', '음… 이 표 예쁘게 다듬어야지.', '오늘 할 일 체크 ✔', '잠깐, 이 문장 좋은데?'],
+  overtime: ['야근 중… 조금만 더!', '마지막 한 단락만!', '커피 수혈이 필요해…', '오늘 안에 끝내자 💪', '창밖이 깜깜해졌네…'],
+  cheer: ['야근 응원 간식 왔어요 🍙', '무리하지 말고 이거 먹어요!', '따뜻한 차 한 잔 하고 해요.'],
 };
+// 캐릭터별 말투(같은 상황이라도 성격이 묻어나게) — v1 LIFE_PERSONAS 설정을 따름
+const PL = {
+  lead: { // 차분, 오래된 책·산책
+    greetMorning: ['좋은 아침이에요. 천천히 시작해요.', '오늘도 무리하지 말고 가요.'],
+    books: ['이 책, 할아버지 서재 냄새가 나요.', '오래된 책은 여백이 넉넉해서 좋아요.'],
+    garden: ['산책하기 좋은 날이네요.', '걷다 보면 생각이 정리돼요.'],
+    ask: ['요즘 마음은 좀 어때요?', '천천히 걸을래요?'],
+    laugh: ['허허, 그렇군요.', '그 말 들으니 마음이 편하네요.'],
+    coffee: ['커피는 천천히 내려야 맛있어요.'],
+    cat: ['까망이는 나랑 산책 취향이 같아.'],
+  },
+  research: { // 호기심, 먼저 말 걸기
+    greetMorning: ['있잖아요! 오늘 재밌는 거 발견했어요!', '굿모닝! 오늘은 무슨 일 생길까요?'],
+    ask: ['그거 왜 그런 거예요? 궁금해요!', '저 질문 하나만 더 해도 돼요?', '이거 알아요? 고양이는 하루에 16시간 잔대요!'],
+    books: ['이 책 각주가 보물창고예요!', '목차만 봐도 설레요.'],
+    laugh: ['진짜요?! 더 얘기해 줘요!', '와, 새로운 사실이다!'],
+    cat: ['귤이는 왜 상자를 좋아할까? 궁금해…'],
+    board: ['질문 목록이 벌써 열두 개예요!'],
+  },
+  writer: { // 다정, 표현 즐김
+    greetMorning: ['오늘 아침 하늘은 연한 복숭아색이에요 🌷', '좋은 아침! 머리 예쁘게 됐네요.'],
+    coffee: ['오늘 커피는 구름 맛이에요. 몽글몽글.', '라떼 위에 하트 그렸어요, 받아요 ♥'],
+    garden: ['꽃잎 하나 주워서 메모장에 끼웠어요.', '바람이 간질간질해요.'],
+    answer: ['그 마음 너무 알 것 같아요.', '오늘 이야기 메모해 둘래요!'],
+    laugh: ['헤헷, 귀여워라.', '그 표현 너무 예뻐요!'],
+    couple: ['오늘 하루를 한 줄로 쓰면 "당신이랑 커피"예요.'],
+  },
+  reviewer: { // 신중, 동료 챙김
+    greetMorning: ['잘 잤어요? 물 한 잔 먼저 마셔요.', '오늘 쌀쌀해요. 겉옷 챙겨요.'],
+    ask: ['괜찮아요? 표정이 조금 피곤해 보여요.', '점심은 챙겨 먹었어요?'],
+    coffee: ['커피는 두 잔까지만이에요. 약속.', '빈속엔 라떼가 나아요.'],
+    books: ['음… 이 부분은 다시 읽어 봐야겠다.', '조용한 데서 읽으니까 좋네요.'],
+    laugh: ['…후훗. 그건 좀 웃기네요.', '그렇게 생각할 수도 있겠네요.'],
+    tired: ['조금만 눈 붙이고 올게요. 깨워 줘요.'],
+    couple: ['오늘은 일찍 쉬어요. 걱정돼서 그래요.'],
+  },
+  experiment: { // 장난기, 만들기
+    greetMorning: ['짠! 오늘의 코디 등장!', '굿모닝~ 오늘 뭐 만들어 볼까요?'],
+    board: ['짠! 종이컵 로봇 설계도예요.', '이거 실험해 볼래요? 히히', '고양이 자동 간식기, 어때요?'],
+    cat: ['귤이야, 레이저 포인터 놀이 할래?', '까망이랑 숨바꼭질 중이에요. 제가 지는 중.'],
+    ask: ['가위바위보 해요! 지면 커피 사기!', '종이비행기 누가 멀리 날리나 해볼래요?'],
+    laugh: ['히히, 성공!', '으하하, 그거 완전 제 스타일.'],
+    coffee: ['커피에 시나몬 한 번 넣어 봤어요. 실험!'],
+  },
+};
+// 짧은 대화 장면(2~4마디). where: 장소 이름, rel: 'any'|'friend'(친구 이상)|'couple'
+const SCENES = [
+  { where: '카페 라운지', rel: 'any', turns: [[0, '라떼 아트 봐 봐요!'], [1, '…이거 곰이에요, 하트예요?'], [0, '고양이요!'], [1, '아하… 귀엽네요 ㅎㅎ']] },
+  { where: '카페 라운지', rel: 'any', turns: [[0, '마지막 쿠키 누가 먹었어요?'], [1, '(입가에 부스러기)'], [0, '…찾았다!'], [1, '헤헤, 반 나눠 줄게요.']] },
+  { where: '카페 라운지', rel: 'friend', turns: [[0, '오늘 커피는 제가 쏠게요!'], [1, '와, 무슨 날이에요?'], [0, '그냥요. 같이 마시고 싶어서.']] },
+  { where: '자료실', rel: 'any', turns: [[0, '쉿, 여기선 속닥속닥.'], [1, '(속닥) 그 책 재밌어요?'], [0, '(속닥) 완전요!']] },
+  { where: '자료실', rel: 'any', turns: [[0, '이 책 꼭대기 칸에 있어요…'], [1, '제가 꺼내 줄게요!'], [0, '키다리 최고!']] },
+  { where: '자료실', rel: 'friend', turns: [[0, '이 문장 좀 봐요.'], [1, '"천천히 가도 늦지 않다"… 좋다.'], [0, '우리한테 하는 말 같죠?']] },
+  { where: '옥상 정원', rel: 'any', turns: [[0, '저 구름 토끼 모양이에요!'], [1, '어디요? 아, 귀가 길쭉하다!'], [0, '이제 녹아서 강아지가 됐어요.']] },
+  { where: '옥상 정원', rel: 'any', turns: [[0, '새싹 이름 지어 줘요.'], [1, '음… 콩이!'], [0, '콩이야, 무럭무럭 자라라~']] },
+  { where: '옥상 정원', rel: 'friend', turns: [[0, '노을 색 오늘 진짜 예쁘다.'], [1, '사진 찍어 줄까요?'], [0, '같이 찍어요! 하나, 둘—'], [1, '치즈~ 📸']] },
+  { where: '회의실', rel: 'any', turns: [[0, '화이트보드에 고양이 그렸는데 지우기 아까워요.'], [1, '그럼 그 옆에 강아지도 그려요.'], [0, '친구 생겼다!']] },
+  { where: '회의실', rel: 'any', turns: [[0, '회의실 의자 빙글빙글 돌아가요!'], [1, '어지러워요 ㅋㅋ'], [0, '한 바퀴만 더!']] },
+  { where: '연구실', rel: 'any', turns: [[0, '책상 위 선인장 물 줬어요?'], [1, '앗, 깜빡했다!'], [0, '제가 줬어요, 걱정 마요.'], [1, '고마워요 ㅠㅠ']] },
+  { where: '연구실', rel: 'any', turns: [[0, '키보드에 고양이 털이…'], [1, '까망이가 다녀갔군요.'], [0, '흔적을 남기는 고양이…']] },
+  { where: '숙소', rel: 'any', turns: [[0, '내일 몇 시에 일어나요?'], [1, '알람 세 개 맞췄어요.'], [0, '…그럼 네 번째는 제가 깨울게요.']] },
+  { where: '', rel: 'any', turns: [[0, '가위바위보!'], [1, '보!'], [0, '…졌다. 커피 살게요.']] },
+  { where: '', rel: 'any', turns: [[0, '오늘 운세 봤어요?'], [1, '"작은 행운이 온다"래요.'], [0, '저랑 마주친 게 그 행운?'], [1, '하하, 그런가 봐요!']] },
+  { where: '', rel: 'any', turns: [[0, '방금 재채기 세 번 했어요.'], [1, '누가 칭찬하나 봐요!'], [0, '헤헤, 좋은 쪽으로 믿을래요.']] },
+  { where: '', rel: 'friend', turns: [[0, '요즘 힘든 일 없어요?'], [1, '조금요. 근데 얘기하니까 나아요.'], [0, '언제든 말해요. 여기 있을게요.']] },
+  { where: '', rel: 'friend', turns: [[0, '우리 주말에 빵집 투어 갈래요?'], [1, '완전 좋아요! 소금빵부터!'], [0, '약속!'], [1, '새끼손가락 걸어요 🤙']] },
+  { where: '', rel: 'couple', turns: [[0, '오늘 하루 중에 제일 좋았던 거?'], [1, '…지금이요.'], [0, '헤헤, 저도요.']] },
+  { where: '', rel: 'couple', turns: [[0, '손 차갑다.'], [1, '그럼 잡아 줘요.'], [0, '(꼭)'], [1, '따뜻해졌다 ♥']] },
+  { where: '옥상 정원', rel: 'couple', turns: [[0, '별똥별이다!'], [1, '소원 빌었어요?'], [0, '비밀이에요. 근데 당신이랑 관련 있어요.']] },
+  { where: '카페 라운지', rel: 'couple', turns: [[0, '라떼에 하트 그렸어요.'], [1, '이번엔 진짜 하트네요!'], [0, '연습 많이 했어요. 당신 주려고.']] },
+];
 // 성격별 말버릇(문장 끝에 가끔 붙음)
-const TIC = { lead: ['', '', ' 천천히 해요.'], research: ['', '!', ' 궁금하다!'], writer: ['', ' ㅎㅎ', ' 🌷'], reviewer: ['', '', ' 무리하지 말고요.'], experiment: ['', ' 히히', ' 해볼래요?'] };
+const TIC = { lead: ['', '', ' 천천히 해요.', ' 그렇죠?'], research: ['', '!', ' 궁금하다!', ' 신기해!'], writer: ['', ' ㅎㅎ', ' 🌷', ' 헤헷'], reviewer: ['', '', ' 무리하지 말고요.', ' 괜찮죠?'], experiment: ['', ' 히히', ' 해볼래요?', ' 짠!'] };
 // 받침에 따라 조사 고르기(솔과/클로와, 솔이/클로가)
 const jong = w => { const c = w.charCodeAt(w.length - 1) - 0xAC00; return c >= 0 && c <= 11171 && c % 28 !== 0; };
 const J = (w, a, b) => w + (jong(w) ? a : b);
-const say = (p, key) => pick(L[key]) + (Math.random() < 0.3 ? pick(TIC[p.id]) : '');
+const said = new Map(); // 최근에 한 말은 피함
+function say(p, key) {
+  const own = (PL[p.id] && PL[p.id][key]) || [], pool = Math.random() < 0.5 && own.length ? own : [...L[key], ...own];
+  const recent = said.get(p.id) || [];
+  let line = pick(pool); for (let i = 0; i < 4 && recent.includes(line); i++) line = pick(pool);
+  said.set(p.id, [line, ...recent].slice(0, 12));
+  return line + (Math.random() < 0.25 && !/[)?!~]$/.test(line) ? pick(TIC[p.id]) : '');
+}
+function sceneFor(a, b, room, r) {
+  const lvl = r.couple ? 'couple' : r.aff >= 40 ? 'friend' : 'any';
+  const ok = SCENES.filter(s => (!s.where || s.where === room) && (s.rel === 'any' || s.rel === lvl || (s.rel === 'friend' && lvl === 'couple')));
+  const local = ok.filter(s => s.where === room || s.rel === lvl);
+  return pick(local.length && Math.random() < 0.7 ? local : ok);
+}
 
 // ---------------------------------------------------------------- 일지
 const logEl = document.getElementById('log');
@@ -376,7 +479,9 @@ class Agent {
   go(c, r, then) {
     const pth = path({ c: Math.round((this.x - 8) / T), r: Math.round((this.y - 14) / T) }, { c, r });
     if (!pth) { then && then(false); return false; }
-    this.route = pth; this.onArrive = then; this.pose = 'walk'; this.release(); return true;
+    this.release();
+    if (!pth.length) { this.route = []; this.pose = 'stand'; then && then(true); return true; } // 이미 그 자리에 있음
+    this.route = pth; this.onArrive = then; this.pose = 'walk'; return true;
   }
   release() { if (this.spot) { this.spot.busy = null; this.spot = null; } }
   take(sp) { this.release(); sp.busy = this.id; this.spot = sp; }
@@ -481,16 +586,44 @@ function freeSpot(tag, a, near) {
   if (near) c.sort((x, y) => Math.hypot(x.c - near.c, x.r - near.r) - Math.hypot(y.c - near.c, y.r - near.r));
   return near ? c[0] : pick(c);
 }
+// 출퇴근·근무·야근: 출퇴근(지피·솔·클로)은 정해진 시각에 정문으로 출근·퇴근, 기숙(미나·코디)은 숙소에서 생활.
+// 평일 09~18시는 연구 시간(책상 위주, 사이사이 휴식), 진행 중인 과제가 있으면 퇴근 시각이 지나도 야근.
+const activeTask = new Set();   // 진행 중 과제 담당(미리보기: 실제 기록 재생·야근 보기 버튼으로만 켜짐)
+function dayInfo() { const d = new Date(worldMs + 9 * 3600e3), dow = d.getUTCDay(); return { dow, weekend: dow === 0 || dow === 6 }; }
 function schedule(a) {
-  const h = hourNow(), hh = h < 4 ? h + 24 : h;
-  if (hh >= a.sleep || hh < a.wake) return 'sleep';
+  const h = hourNow(), hh = h < 4 ? h + 24 : h, { weekend } = dayInfo(), busy = activeTask.has(a.id);
+  if (a.home === 'dorm') { if (hh >= a.sleep || hh < a.wake) return busy && hh < 26 ? 'overtime' : 'sleep'; }
+  else {
+    const inHours = weekend ? h >= 13 && h < 19 : h >= a.arrive && h < a.leave;
+    if (!inHours) return busy && hh >= 8 && hh < 25 ? 'overtime' : 'home';
+  }
   if (h >= 12 && h < 13) return 'lunch';
   if (h >= 15 && h < 15.5) return 'tea';
-  if (hh >= a.sleep - 0.75) return 'winddown';
+  if (!weekend && h >= 9 && h < 18) return busy ? 'overtime' : 'work';
+  if (busy) return 'overtime';
   return 'free';
+}
+function arrive(a) {
+  a.away = false; a.release(); a.x = 14 * T + 8; a.y = 29 * T + 14; a.pose = 'stand';
+  a.speak(say(a, dayInfo().weekend ? 'visit' : 'arrive'), 4); log(`${a.name} ${dayInfo().weekend ? '주말에 놀러 옴' : '출근'}.`);
+  const sp = spots.find(s => s.id === 'desk-' + a.id); a.gotoSpot(sp, ok => { if (ok) stay(a, rnd(8, 14), { end: x => { x.need.coffee -= 10; } }); });
+}
+function leave(a) {
+  if (activeTask.has(a.id)) return;
+  a.speak(say(a, 'leave'), 4); log(`${a.name} 퇴근.`);
+  a.go(14, 29, ok => { if (!ok) return; a.away = true; a.release(); stay(a, 20); });
+}
+function doOvertime(a) {
+  const sp = spots.find(s => s.id === 'desk-' + a.id);
+  a.gotoSpot(sp, ok => { if (!ok) return; if (Math.random() < 0.6) a.speak(say(a, 'overtime'), 4); stay(a, rnd(25, 40), { tick: (x, dt) => { x.need.energy = clamp(x.need.energy - 0.1 * dt, 5, 100); } }); });
+  if (!a._otLogged) { a._otLogged = true; log(`${a.name}, 과제가 남아 야근 중.`); }
 }
 function think(a) {
   const sch = schedule(a);
+  if (sch === 'home') { if (!a.away) return leave(a); stay(a, 20); return; }
+  if (a.away && !a.act) return arrive(a);
+  if (sch !== 'overtime') a._otLogged = false;
+  if (sch === 'overtime') return doOvertime(a);
   if (sch === 'sleep') return doSleep(a);
   if (a.pose === 'sleep') { a.pose = 'stand'; a.release(); a.speak(say(a, 'greetMorning')); log(`${a.name} 기상. "${a.bubble.text}"`); emit('spark', a.x, a.y - 30, 2); a.hop = 1; a.cool = 2; return; }
   if (sch === 'lunch') return doGather(a, 'meet', 'lunch', '점심');
@@ -501,6 +634,11 @@ function think(a) {
   // 고백 장면 조건
   const crush = crushOf(a);
   if (crush && h >= 16 && Math.random() < 0.25 && !crush.busy) return doConfess(a, crush);
+  // 야근하는 동료 응원(간식·커피 배달)
+  const worker = agents.find(b => b !== a && !b.away && schedule(b) === 'overtime' && b.spot && b.spot.tags.includes('desk'));
+  if (worker && sch === 'free' && Math.random() < 0.18) return doGift(a, worker);
+  // 연구 시간: 대부분 책상(연출), 사이사이 휴식
+  if (sch === 'work' && Math.random() < 0.62) return doDesk(a, true);
   const n = a.need, f = a.fav;
   const opts = [
     ['coffee', (100 - n.coffee) * 1.2 * f.coffee],
@@ -548,9 +686,9 @@ function doWindow(a) {
   const sp = freeSpot('window', a); if (!sp) { stay(a, 3); return; }
   a.gotoSpot(sp, ok => { if (!ok) return; stay(a, rnd(5, 9), { tick: (x, dt) => Math.random() < dt * 0.4 && emit('note', x.x, x.y - 34, 1), end: x => { x.need.fun += 10; } }); });
 }
-function doDesk(a) {
+function doDesk(a, work) {
   const sp = spots.find(s => s.id === 'desk-' + a.id);
-  a.gotoSpot(sp, ok => { if (!ok) return; stay(a, rnd(14, 26), { end: x => { x.need.energy -= 4; } }); log(`${a.name}, 자기 책상에서 ${pick(a.likes)} 정리(개인 시간).`); });
+  a.gotoSpot(sp, ok => { if (!ok) return; if (work && Math.random() < 0.35) a.speak(say(a, 'work'), 3.5); stay(a, work ? rnd(30, 55) : rnd(14, 26), { end: x => { x.need.energy -= 4; x.need.fun -= work ? 6 : 0; } }); if (!work) log(`${a.name}, 자기 책상에서 ${pick(a.likes)} 정리(개인 시간).`); });
 }
 function doNap(a) {
   const sp = freeSpot('sofa', a); if (!sp) return doWindow(a);
@@ -602,7 +740,7 @@ function talk(a, b, turns, onDone) {
   face(); let i = 0, gap = 0;
   const lines = turns;
   const t = lines.length * 3.4 + 0.5;
-  const tick = (x, dt) => { gap -= dt; if (gap <= 0 && i < lines.length) { const [who, text, fx] = lines[i++]; (who ? b : a).speak(text, 3.2); if (fx) fx(); gap = 3.4; } };
+  const tick = (x, dt) => { gap -= dt; if (gap <= 0 && i < lines.length) { const [who, text, fx] = lines[i++]; if (text) (who ? b : a).speak(text, 3.2); if (fx) fx(); gap = text ? 3.4 : 0.6; } };
   a.act = { t, talk: true, tick, end: () => onDone && onDone() }; b.act = { t, talk: true };
 }
 function doChat(a) {
@@ -614,8 +752,11 @@ function doChat(a) {
   a.go(tgt[0], tgt[1], ok => {
     if (!ok) { b.act = null; return; }
     const [k1, k2] = topicFor(a, b), r = R(a.id, b.id);
-    const lines = [[0, say(a, k1)], [1, say(b, k2)]];
-    if (Math.random() < 0.6) lines.push([0, say(a, 'laugh'), () => emit('note', a.x, a.y - 34, 1)]);
+    const room = ROOMS[grid[Math.round((a.y - 14) / T)]?.[Math.round((a.x - 8) / T)]?.room] || '';
+    let lines;
+    if (Math.random() < 0.55) lines = sceneFor(a, b, room, r).turns.map(([w, t]) => [w, t]);
+    else { lines = [[0, say(a, k1)], [1, say(b, k2)]]; if (Math.random() < 0.6) lines.push([0, say(a, 'laugh'), () => emit('note', a.x, a.y - 34, 1)]); }
+    if (r.couple) lines.push([1, '', () => emit('heart', (a.x + b.x) / 2, Math.min(a.y, b.y) - 36, 2)]);
     if (r.aff >= 85 && r.romance && !r.couple) lines.push([1, say(b, 'crush'), () => { b.blush = 6; emit('heart', b.x, b.y - 34, 1); }]);
     talk(a, b, lines, () => {
       const gain = rnd(2, 5) * (1 + (a.fav.chat + b.fav.chat - 2) * 0.5); r.aff = clamp(r.aff + gain, 0, 100); r.talks++; relSave();
@@ -627,17 +768,17 @@ function doChat(a) {
 }
 function coupleOf(a) { const p = others(a).find(b => R(a.id, b.id).couple); return p || null; }
 function crushOf(a) { return others(a).find(b => { const r = R(a.id, b.id); return r.romance && !r.couple && r.aff >= 88 && b.pose !== 'sleep'; }) || null; }
-function doGift(a) {
-  const to = coupleOf(a) || crushOf(a) || nearestFree(a)[0]; if (!to) return doCoffee(a);
+function doGift(a, target) {
+  const to = target || coupleOf(a) || crushOf(a) || nearestFree(a)[0]; if (!to) return doCoffee(a);
   const sp = freeSpot('coffee', a); if (!sp) return doWindow(a);
   a.gotoSpot(sp, ok => { if (!ok) return; stay(a, 3, { end: x => {
     const tgt = [[1, 0], [-1, 0], [0, 1]].map(([dc, dr]) => [Math.round((to.x - 8) / T) + dc, Math.round((to.y - 14) / T) + dr]).find(t => passable(...t));
-    if (!tgt || to.busy || to.pose === 'sleep') return;
+    if (!tgt || (to.busy && !target) || to.pose === 'sleep') return;
     to.act = { t: 20, talk: true, lock: true };
     x.carry = true;
     x.go(tgt[0], tgt[1], ok2 => { x.carry = false; if (!ok2) { to.act = null; return; }
       const r = R(x.id, to.id);
-      talk(x, to, [[0, say(x, 'gift')], [1, say(to, 'thanks'), () => { emit('heart', to.x, to.y - 34, 2); to.need.coffee = 100; }]], () => { r.aff = clamp(r.aff + 6, 0, 100); relSave(); });
+      talk(x, to, [[0, say(x, target ? 'cheer' : 'gift')], [1, say(to, 'thanks'), () => { emit('heart', to.x, to.y - 34, 2); to.need.coffee = 100; }]], () => { r.aff = clamp(r.aff + 6, 0, 100); relSave(); });
       log(`${J(x.name, '이', '가')} ${to.name}에게 커피를 건넴.`, r.romance ? 'love' : 'life');
     });
   } }); });
@@ -696,7 +837,7 @@ async function replay() {
   const ag = id => agents.find(a => a.id === id);
   for (const a of agents) { if (a.pose === 'sleep') { a.pose = 'stand'; a.release(); } a.away = false; }
   for (const step of REAL) {
-    const a = ag(step.who); a.real = step; a.act = null; a.route = [];
+    const a = ag(step.who); a.real = step; a.act = null; a.route = []; if (a.away) { a.away = false; a.x = 14 * T + 8; a.y = 29 * T + 14; }
     await new Promise(res => {
       const doIt = () => {
         a.speak(step.text, step.secs + 1, true);
@@ -734,29 +875,56 @@ function buildStatic() {
     const t = grid[r][cc];
     if (t.wall) continue;
     if (t.room === 5) { // 잔디
-      g.fillStyle = (cc + r) % 2 ? '#86b468' : '#80ae63'; g.fillRect(cc * T, r * T, T, T);
+      g.fillStyle = '#86b468'; g.fillRect(cc * T, r * T, T, T); for (let k = 0; k < 3; k++) { g.fillStyle = Math.random() < .5 ? 'rgba(255,255,255,.05)' : 'rgba(0,40,0,.05)'; g.fillRect(cc * T + Math.floor(Math.random() * 12), r * T + Math.floor(Math.random() * 12), 4 + Math.floor(Math.random() * 4), 3); }
       for (let k = 0; k < 5; k++) { g.fillStyle = Math.random() < .5 ? '#6f9d56' : '#97c57a'; g.fillRect(cc * T + Math.floor(Math.random() * 15), r * T + Math.floor(Math.random() * 15), 1, 2); }
       if (Math.random() < 0.12) { g.fillStyle = pick(['#ffd1dc', '#fff3a8', '#ffffff', '#f6a5b5']); const fx = cc * T + 4 + Math.floor(Math.random() * 8), fy = r * T + 4 + Math.floor(Math.random() * 8); g.fillRect(fx, fy, 2, 2); g.fillStyle = '#e9b949'; g.fillRect(fx, fy, 1, 1); }
       continue;
     }
-    const [k, col] = FLOORS[t.room] || FLOORS[4];
-    g.drawImage(tintFloor(k, col), cc * T, r * T);
+    continue; // 나무 바닥은 방 단위로 아래에서 그림
   }
   // 연못(정원)
   g.fillStyle = '#4f86b8'; g.fillRect(41 * T + 4, 18 * T + 4, 30, 18); g.fillStyle = '#76a9d6'; g.fillRect(41 * T + 7, 18 * T + 6, 12, 3);
-  // 러그
-  g.fillStyle = '#c96f63'; g.fillRect(38 * T, 6 * T - 4, 6 * T, 3 * T + 4); g.fillStyle = '#e19a8b'; g.fillRect(38 * T + 3, 6 * T - 1, 6 * T - 6, 3 * T - 2);
-  g.fillStyle = '#7e93b8'; g.fillRect(36 * T, 25 * T, 6 * T, 3 * T);
+  // 나무 판자 바닥(엇갈린 판자·결·이음새) — v1 사무실 바닥 방식
+  const WOOD = { 1: [['#b98e62', '#b2875b', '#bf956a', '#b48a5f'], '#94704b'], 2: [['#e2cfaa', '#dcc8a1', '#e7d5b3', '#dfcca6'], '#c3ad86'],
+    3: [['#d9b98f', '#d3b287', '#dfc199', '#d6b68c'], '#b99a71'], 4: [['#d4b58d', '#cfad81', '#d8ba94', '#d0b087'], '#b89970'], 6: [['#dcc3a2', '#d6bc99', '#e1c9a9', '#d9c09d'], '#bea383'] };
+  for (const [room, [cols, seam]] of Object.entries(WOOD)) {
+    const [c0, r0, c1, r1] = ROOM_VIEW[room]; const x0 = c0 * T, y0 = r0 * T, w = (c1 - c0 + 1) * T, h = (r1 - r0 + 1) * T;
+    g.save(); g.beginPath(); g.rect(x0, y0, w, h); g.clip();
+    for (let row = 0, y = y0; y < y0 + h; row++, y += 8) {
+      let x = x0 - ((row * 13) % 40);
+      for (let k = 0; x < x0 + w; k++) { const len = 34 + ((row * 7 + k * 11) % 4) * 6;
+        g.fillStyle = cols[(k + row * 3) % cols.length]; g.fillRect(x, y, len - 1, 7);
+        g.fillStyle = seam; g.fillRect(x + len - 1, y, 1, 7);
+        if ((k + row) % 3 === 0) { g.fillStyle = 'rgba(120,86,52,.14)'; g.fillRect(x + 6, y + 3, Math.min(14, len - 10), 1); }
+        x += len; }
+      g.fillStyle = seam; g.fillRect(x0, y + 7, w, 1);
+    }
+    g.restore();
+  }
+  // 문턱(문 칸)도 같은 바닥
+  for (let r = 0; r < ROWS; r++) for (let cc = 0; cc < COLS; cc++) if (grid[r][cc].door) { g.fillStyle = '#c8a77c'; g.fillRect(cc * T, r * T, T, T); g.fillStyle = '#a98a62'; g.fillRect(cc * T, r * T + 7, T, 1); }
+  // 러그(v1식: 그림자·테두리·안쪽 바느질선)
+  const rug = (x, y, w, h, col, border) => { g.fillStyle = 'rgba(66,44,26,.12)'; g.fillRect(x + 2, y + 2, w, h); g.fillStyle = border; g.fillRect(x, y, w, h);
+    g.fillStyle = col; g.fillRect(x + 3, y + 3, w - 6, h - 6); g.strokeStyle = border; g.lineWidth = 1; g.strokeRect(x + 6.5, y + 6.5, w - 13, h - 13); };
+  rug(37 * T + 8, 5 * T + 8, 7 * T, 4 * T, '#e4a99b', '#f6dcd2');   // 라운지
+  rug(3 * T, 6 * T + 8, 8 * T, 5 * T, '#c7c8ad', '#eeead7');        // 자료실 독서
+  rug(20 * T, 5 * T + 8, 8 * T, 6 * T, '#7d947f', '#d1d2ad');      // 회의실
+  rug(2 * T, 18 * T + 8, 20 * T, 7 * T, '#b8b396', '#e0d5b7');     // 연구실 책상 구역
+  rug(35 * T, 25 * T, 8 * T, 3 * T, '#a9a1c9', '#e2dcef');          // 숙소
+  // 정원 징검돌 길
+  for (const [c, r] of [[39, 14], [38, 15], [37, 16], [36, 17], [35, 18], [35, 19], [40, 16], [41, 16], [43, 16], [44, 17]]) {
+    g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(c * T + 3, r * T + 5, 11, 8); g.fillStyle = '#d8d2c4'; g.fillRect(c * T + 2, r * T + 3, 11, 8); g.fillStyle = '#ebe6da'; g.fillRect(c * T + 3, r * T + 4, 5, 2); }
   // 벽(윗면 + 앞면)
   for (let r = 0; r < ROWS; r++) for (let cc = 0; cc < COLS; cc++) {
     if (!grid[r][cc].wall) continue;
     const below = grid[r + 1] && grid[r + 1][cc] && !grid[r + 1][cc].wall;
-    g.fillStyle = '#e8dcc4'; g.fillRect(cc * T, r * T, T, T);
-    g.fillStyle = '#d6c7a9'; g.fillRect(cc * T, r * T + T - 3, T, 3);
+    g.fillStyle = '#eee7d8'; g.fillRect(cc * T, r * T, T, T);
+    g.fillStyle = '#a7835d'; g.fillRect(cc * T, r * T + T - 3, T, 3);
     if (below) { g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(cc * T, (r + 1) * T, T, 3); }
   }
   // 바깥 벽 윗줄 앞면(창문 자리)
-  for (let cc = 1; cc < COLS - 1; cc++) { g.fillStyle = '#d9c9ab'; g.fillRect(cc * T, 1 * T, T, T); g.fillStyle = '#c4b392'; g.fillRect(cc * T, 2 * T - 2, T, 2); }
+  for (let cc = 1; cc < COLS - 1; cc++) { g.fillStyle = '#f2ecdd'; g.fillRect(cc * T, 1 * T, T, T); g.fillStyle = '#345546'; g.fillRect(cc * T, 1 * T + 9, T, 6);
+    g.fillStyle = '#294739'; if (cc % 3 === 0) g.fillRect(cc * T + 4, 1 * T + 10, 1, 5); g.fillStyle = '#947956'; g.fillRect(cc * T, 2 * T - 1, T, 1); g.fillRect(cc * T, 1 * T + 8, T, 1); }
   return c;
 }
 function skyColor(h) {
@@ -786,7 +954,20 @@ function drawBeds() {
     cx.fillStyle = 'rgba(255,255,255,.25)'; cx.fillRect((x + 1) * S, (y + 9) * S, 14 * S, 3 * S);
   }
 }
+const glows = [];
+function pcOn(owner) { const a = agents.find(a => a.id === owner); return a && a.spot && a.spot.id === 'desk-' + owner && a.pose === 'type' && !a.route.length; }
 function drawItem(it) {
+  if (it.pc) { // 컴퓨터: 앉아서 작업 중이면 화면이 깜빡이며 빛남
+    const on = pcOn(it.pc), t = performance.now() / 1000;
+    const im = imgs[on ? 'PC_FRONT_ON_' + (1 + Math.floor(t * 5) % 3) : 'PC_FRONT_OFF']; if (!im) return;
+    if (on) { const a = agents.find(a => a.id === it.pc), real = !!(a && a.real), pulse = 0.55 + 0.25 * Math.sin(t * 6);
+      const gx = (it.x + 8) * S, gy = (it.y + 12) * S; glows.push([gx, gy, real, pulse]);
+      const g = cx.createRadialGradient(gx, gy, 2, gx, gy, 26 * S);
+      g.addColorStop(0, real ? `rgba(150,255,170,${pulse * 0.6})` : `rgba(140,210,255,${pulse * 0.55})`); g.addColorStop(1, 'rgba(140,210,255,0)');
+      cx.fillStyle = g; cx.fillRect(gx - 26 * S, gy - 26 * S, 52 * S, 52 * S);
+      if (Math.random() < (real ? 0.12 : 0.05)) emit('spark', it.x + 6, it.y + 2, 1, real ? '#b7ffb0' : '#bfe8ff'); }
+    cx.drawImage(im, it.x * S, it.y * S, it.w * S, it.h * S); return;
+  }
   const im = imgs[it.k]; if (!im) return;
   if (it.flip) { cx.save(); cx.translate((it.x + it.w) * S, 0); cx.scale(-1, 1); cx.drawImage(im, 0, it.y * S, it.w * S, it.h * S); cx.restore(); }
   else cx.drawImage(im, it.x * S, it.y * S, it.w * S, it.h * S);
@@ -813,6 +994,13 @@ function render(dt) {
     }
     cx.globalCompositeOperation = 'source-over';
   }
+  // 모니터·책상 스탠드 불빛(어둠 위에 더해 반짝임이 보이게)
+  if (dk > 0) { cx.globalCompositeOperation = 'lighter';
+    for (const [gx, gy, real, pulse] of glows) { const g = cx.createRadialGradient(gx, gy, 2, gx, gy, 30 * S);
+      g.addColorStop(0, real ? `rgba(120,255,150,${0.35 * pulse})` : `rgba(120,200,255,${0.35 * pulse})`); g.addColorStop(1, 'rgba(0,0,0,0)'); cx.fillStyle = g; cx.fillRect(gx - 30 * S, gy - 30 * S, 60 * S, 60 * S);
+      const g2 = cx.createRadialGradient(gx - 12 * S, gy + 8 * S, 2, gx - 12 * S, gy + 8 * S, 36 * S); g2.addColorStop(0, 'rgba(255,190,110,.32)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); cx.fillStyle = g2; cx.fillRect(gx - 50 * S, gy - 30 * S, 80 * S, 80 * S); }
+    cx.globalCompositeOperation = 'source-over'; }
+  glows.length = 0;
   drawParts(dt);
   // 방 이름
   cx.font = `${9 * S}px ${getComputedStyle(document.body).fontFamily}`; cx.fillStyle = 'rgba(60,48,36,.55)';
@@ -867,10 +1055,16 @@ function panel() {
 }
 
 // ---------------------------------------------------------------- 입력
-cv.addEventListener('click', e => {
+let drag = null, dragged = false;
+cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y }; dragged = false; });
+addEventListener('pointermove', e => { if (!drag) return; const k = cv.getBoundingClientRect().width / (VW * T), dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!dragged && Math.hypot(dx, dy) < 8) return; dragged = true; follow = false; cam.tx = drag.cx - dx / k; cam.ty = drag.cy - dy / k; });
+addEventListener('pointerup', () => { drag = null; });
+cv.style.touchAction = 'none';
+cv.addEventListener('click', e => { if (dragged) { dragged = false; return; }
   const rect = cv.getBoundingClientRect(), x = (e.clientX - rect.left) / rect.width * VW * T + cam.x, y = (e.clientY - rect.top) / rect.height * VH * T + cam.y;
   const hit = agents.filter(a => !a.away).map(a => ({ a, d: Math.hypot(a.x - x, a.y - 14 - y) })).sort((p, q) => p.d - q.d)[0];
-  if (hit && hit.d < 22) { selected = hit.a.id; follow = true; panel(); if (!hit.a.bubble && !hit.a.real) { hit.a.speak(pick(['안녕하세요!', '네?', '헤헤', '오늘도 좋은 하루!', '(손 흔들기)'])); hit.a.hop = 0.8; } }
+  if (hit && hit.d < 22) { selected = hit.a.id; follow = true; panel(); if (!hit.a.bubble && !hit.a.real) { hit.a.speak(say(hit.a, 'hello')); hit.a.hop = 0.8; } }
 });
 function setSpeed(v) { speed = v; for (const [id, s] of [['sp1', 1], ['sp30', 30], ['sp240', 240]]) document.getElementById(id).setAttribute('aria-pressed', String(s === v)); }
 document.getElementById('sp1').onclick = () => { setSpeed(1); worldMs = Date.now(); };
@@ -878,12 +1072,14 @@ document.getElementById('sp30').onclick = () => setSpeed(30);
 document.getElementById('sp240').onclick = () => setSpeed(240);
 document.getElementById('pause').onclick = e => { paused = !paused; e.target.setAttribute('aria-pressed', String(paused)); e.target.textContent = paused ? '계속' : '멈춤'; };
 document.getElementById('replay').onclick = replay;
+document.getElementById('ot').onclick = e => { const on = !activeTask.size; activeTask.clear(); if (on) { activeTask.add('writer'); activeTask.add('research'); }
+  e.target.setAttribute('aria-pressed', String(on)); log(on ? '시험 시뮬레이션: 솔·미나에게 진행 중 과제가 있다고 가정(야근 장면). 실제 과제 아님.' : '야근 시뮬레이션 끔.', 'real'); };
 
 // ---------------------------------------------------------------- 카메라·미니맵
 function fit() {
   const w = document.getElementById('stage').clientWidth;
-  VW = w >= 1000 ? 21 : w >= 760 ? 18 : w >= 520 ? 15 : 12;
-  VH = Math.round(VW * 0.6);
+  VW = w >= 1000 ? 21 : w >= 760 ? 18 : w >= 520 ? 15 : 11;
+  VH = w < 520 ? 12 : Math.round(VW * 0.6);   // 휴대폰 세로 화면은 거의 정사각형으로 크게
   cv.width = VW * T * S; cv.height = VH * T * S; cx.imageSmoothingEnabled = false;
   cx.font = `${9 * S}px ${getComputedStyle(document.body).fontFamily}`;
 }
@@ -926,7 +1122,8 @@ function loop(now) {
     drawMini();
   }
   overlay();
-  if ((panelT -= dt) <= 0) { panel(); panelT = 0.5; const t = kst(worldMs); clockEl.textContent = `${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')} KST${speed > 1 ? ' · ' + speed + '배' : ''}`; }
+  if ((panelT -= dt) <= 0) { panel(); panelT = 0.5; const t = kst(worldMs); const di = dayInfo(), hn = hourNow(), mode = di.weekend ? '주말' : hn >= 9 && hn < 18 ? '연구 시간' : hn >= 18 && hn < 23 ? '퇴근 후' : hn >= 23 || hn < 6 ? '한밤' : '출근 전';
+    clockEl.textContent = `${'일월화수목금토'[di.dow]} ${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')} · ${mode}${speed > 1 ? ' · ' + speed + '배' : ''}`; }
   requestAnimationFrame(loop);
 }
 Promise.all(Object.keys(ASSETS).map(load)).then(async () => {
@@ -934,6 +1131,7 @@ Promise.all(Object.keys(ASSETS).map(load)).then(async () => {
   relInit(); buildMap(); staticLayer = buildStatic(); fit();
   agents = PEOPLE.map((p, i) => new Agent(p, i));
   // 지금 시간대에 맞게 시작 자세
+  for (const a of agents) if (schedule(a) === 'home') { a.away = true; a.x = 14 * T + 8; a.y = 29 * T + 14; }
   for (const a of agents) if (schedule(a) === 'sleep') { const sp = spots.find(s => s.id === 'bed-' + a.id); a.x = (sp.c + 1) * T + 8; a.y = (sp.r + 1) * T + 14; a.take(sp); a.pose = 'sleep'; }
   cats = [new Cat('pet_gitcat', 40, 8, '까망이'), new Cat('pet_claudio', 36, 17, '귤이')];
   camTarget(); cam.x = cam.tx; cam.y = cam.ty;
@@ -941,6 +1139,7 @@ Promise.all(Object.keys(ASSETS).map(load)).then(async () => {
   const couples = Object.entries(rel).filter(([, r]) => r.couple).map(([k]) => k.split('|').map(id => byId[id].name).join('·'));
   if (couples.length) log(`지난번에 이어서: ${couples.join(', ')} 커플 💕`, 'love');
   panel(); requestAnimationFrame(loop);
+  window.__labState = () => agents.map(a => ({ id: a.id, pose: a.pose, spot: a.spot && a.spot.id, route: a.route.length, away: a.away, act: !!a.act, sch: schedule(a), pc: pcOn(a.id) }));
 });
 })();
 </script>
