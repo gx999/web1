@@ -83,6 +83,6 @@ lab-v2 코드 수정, 기존 v1 연구소·P1 기록 변경. 의심되면 아무
 6. list_triggers 도구가 있으면 같은 예약의 get_trigger 결과를 /tmp/t.json에 저장 → `$M schedule-record --trigger-json /tmp/t.json`
 7. `$M summary --run $RUN` → `$M unlock --run $RUN`
 8. 결과 요약(잠금, 지시 처리, openai_calls, 비용, 오류)을 $D/ops/runs/$RUN.json 으로 저장하고
-   `cd $D && git add -A ledger status ops jobs tests && git commit -m "run: $RUN" && git push origin HEAD:main`
+   `cd $D && git add -A && (git commit -qm "run: $RUN" || true) && git push origin HEAD:main`
    (거절 시 git pull --rebase 후 1회 재시도, 충돌이면 그대로 종료). 같은 요약을 최종 답변에도 쓰세요.
 ```
