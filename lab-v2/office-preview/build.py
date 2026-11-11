@@ -13,6 +13,9 @@ for f in sorted(glob.glob(os.path.join(src, '**', '*.png'), recursive=True)):
         continue
     keys[name] = 'data:image/png;base64,' + base64.b64encode(open(f, 'rb').read()).decode()
 html = open(os.path.join(here, 'office.src.html'), encoding='utf-8').read().replace('/*__ASSETS__*/{}', json.dumps(keys))
+sample = os.path.join(here, 'sample-state.json')
+if os.path.exists(sample):
+    html = html.replace('/*__SAMPLE__*/null', json.dumps(json.load(open(sample, encoding='utf-8')), ensure_ascii=False))
 os.makedirs(os.path.join(here, 'dist'), exist_ok=True)
 out = os.path.join(here, 'dist', 'lab-office-life.html')
 open(out, 'w', encoding='utf-8').write(html)

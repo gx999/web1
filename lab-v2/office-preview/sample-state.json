@@ -1,0 +1,233 @@
+{
+ "mode": "live",
+ "revision": 19,
+ "serverTime": "2026-11-11T00:00:40Z",
+ "sourceObservedAt": "2026-11-10T23:12:34Z",
+ "execution": {
+  "enabled": true,
+  "reason": ""
+ },
+ "lab": {
+  "name": "정대용 디지털 연구소",
+  "motto": "",
+  "status": "idle",
+  "paused": false
+ },
+ "agents": [
+  {
+   "id": "lead",
+   "name": "지피",
+   "role": "연구팀장",
+   "state": "idle",
+   "summary": "",
+   "taskId": null,
+   "observedAt": "2026-11-10T23:12:34Z",
+   "workerHeartbeatAt": null
+  },
+  {
+   "id": "research",
+   "name": "미나",
+   "role": "자료 조사",
+   "state": "idle",
+   "summary": "",
+   "taskId": null,
+   "observedAt": "2026-11-10T23:12:34Z",
+   "workerHeartbeatAt": null
+  },
+  {
+   "id": "writer",
+   "name": "솔",
+   "role": "논증 집필",
+   "state": "idle",
+   "summary": "",
+   "taskId": null,
+   "observedAt": "2026-11-10T23:12:34Z",
+   "workerHeartbeatAt": null
+  },
+  {
+   "id": "reviewer",
+   "name": "클로",
+   "role": "독립 검증",
+   "state": "idle",
+   "summary": "",
+   "taskId": null,
+   "observedAt": "2026-11-10T23:12:34Z",
+   "workerHeartbeatAt": null
+  },
+  {
+   "id": "experiment",
+   "name": "코디",
+   "role": "실험 재현",
+   "state": "idle",
+   "summary": "",
+   "taskId": null,
+   "observedAt": "2026-11-10T23:12:34Z",
+   "workerHeartbeatAt": null
+  }
+ ],
+ "projects": [
+  {
+   "id": "T24-1",
+   "title": "시험 과제",
+   "status": "done",
+   "priority": 3,
+   "updatedAt": "2026-11-10T14:21:11Z",
+   "artifactVersion": ""
+  }
+ ],
+ "events": [
+  {
+   "id": "J-T24-1:accept",
+   "agentId": "lead",
+   "type": "accept",
+   "state": "queued",
+   "summary": "지시 T24-1 접수 (시험)",
+   "at": "2026-11-10T14:19:46Z"
+  },
+  {
+   "id": "J-T24-1:collect:start",
+   "agentId": "research",
+   "type": "step_start",
+   "state": "researching",
+   "summary": "공식 원문 수집 시작",
+   "at": "2026-11-10T14:19:46Z"
+  },
+  {
+   "id": "J-T24-1:collect",
+   "agentId": "research",
+   "type": "step_done",
+   "state": "researching",
+   "summary": "공식 원문 수집 · 2건 중 2건 확보",
+   "at": "2026-11-10T14:19:59Z"
+  },
+  {
+   "id": "J-T24-1:handoff:collect",
+   "agentId": "research",
+   "type": "handoff",
+   "toAgentId": "writer",
+   "summary": "원문 전달",
+   "at": "2026-11-10T14:20:06Z"
+  },
+  {
+   "id": "J-T24-1:draft:start:1",
+   "agentId": "writer",
+   "type": "step_start",
+   "state": "writing",
+   "summary": "초안 작성 시작",
+   "at": "2026-11-10T14:20:06Z"
+  },
+  {
+   "id": "J-T24-1:draft:done:1",
+   "agentId": "writer",
+   "type": "step_done",
+   "state": "writing",
+   "summary": "초안 작성 완료 · 1,240자",
+   "at": "2026-11-10T14:20:17Z"
+  },
+  {
+   "id": "J-T24-1:handoff:draft",
+   "agentId": "writer",
+   "type": "handoff",
+   "toAgentId": "reviewer",
+   "summary": "초안을 검토로",
+   "at": "2026-11-10T14:20:30Z"
+  },
+  {
+   "id": "J-T24-1:review:start:1",
+   "agentId": "reviewer",
+   "type": "step_start",
+   "state": "reviewing",
+   "summary": "독립 검토 시작",
+   "at": "2026-11-10T14:20:30Z"
+  },
+  {
+   "id": "J-T24-1:review:done:1",
+   "agentId": "reviewer",
+   "type": "step_done",
+   "state": "reviewing",
+   "summary": "검토 판정: 수정 필요",
+   "at": "2026-11-10T14:20:38Z"
+  },
+  {
+   "id": "J-T24-1:handoff:review",
+   "agentId": "reviewer",
+   "type": "handoff",
+   "toAgentId": "writer",
+   "summary": "검토 의견 전달",
+   "at": "2026-11-10T14:20:52Z"
+  },
+  {
+   "id": "J-T24-1:revise:start:1",
+   "agentId": "writer",
+   "type": "step_start",
+   "state": "writing",
+   "summary": "검토 반영 수정 시작",
+   "at": "2026-11-10T14:20:52Z"
+  },
+  {
+   "id": "J-T24-1:revise:done:1",
+   "agentId": "writer",
+   "type": "step_done",
+   "state": "writing",
+   "summary": "검토 반영 수정 완료 · 1,379자",
+   "at": "2026-11-10T14:21:02Z"
+  },
+  {
+   "id": "J-T24-1:complete",
+   "agentId": "lead",
+   "type": "complete",
+   "state": "done",
+   "summary": "지시 T24-1 완료 기록",
+   "at": "2026-11-10T14:21:11Z"
+  },
+  {
+   "id": "patrol:run-20261110T181250Z",
+   "agentId": "lead",
+   "type": "patrol",
+   "state": "idle",
+   "summary": "매시 점검",
+   "at": "2026-11-10T18:12:50Z"
+  },
+  {
+   "id": "patrol:run-20261110T191525Z",
+   "agentId": "lead",
+   "type": "patrol",
+   "state": "idle",
+   "summary": "매시 점검",
+   "at": "2026-11-10T19:15:25Z"
+  },
+  {
+   "id": "patrol:run-20261110T201306Z",
+   "agentId": "lead",
+   "type": "patrol",
+   "state": "idle",
+   "summary": "매시 점검",
+   "at": "2026-11-10T20:13:06Z"
+  },
+  {
+   "id": "patrol:run-20261110T211234Z",
+   "agentId": "lead",
+   "type": "patrol",
+   "state": "idle",
+   "summary": "매시 점검",
+   "at": "2026-11-10T21:12:34Z"
+  },
+  {
+   "id": "patrol:run-20261110T221848Z",
+   "agentId": "lead",
+   "type": "patrol",
+   "state": "idle",
+   "summary": "매시 점검",
+   "at": "2026-11-10T22:18:48Z"
+  },
+  {
+   "id": "patrol:run-20261110T231234Z",
+   "agentId": "lead",
+   "type": "patrol",
+   "state": "idle",
+   "summary": "매시 점검",
+   "at": "2026-11-10T23:12:34Z"
+  }
+ ],
+ "reports": []
+}

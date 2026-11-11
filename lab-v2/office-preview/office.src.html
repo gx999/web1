@@ -40,6 +40,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
 .hud button { background: var(--hud); color: var(--hud-ink); border-color: transparent; font-size: 13px; padding: 5px 10px; min-height: 32px; backdrop-filter: blur(2px) }
 .hud button[aria-pressed="true"] { background: #fff4d6; color: #2f2a24 }
 .floors, .clockbox, .people, .zoom { display: flex; gap: 5px; align-items: center; flex-wrap: wrap }
+.clock.live { color: #b9f0b2 }
 .clock { background: var(--hud); color: var(--hud-ink); border-radius: 999px; padding: 6px 11px; font-family: var(--font-display); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap }
 .people button .dot { display: inline-block; margin-right: 5px; vertical-align: 1px }
 #mini { position: absolute; right: 8px; top: 48px; width: min(30%, 260px); height: auto; border: 2px solid #3b3128; border-radius: 6px; background: #2a241e; opacity: .92; cursor: pointer; image-rendering: pixelated }
@@ -125,7 +126,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
     <div class="overlay" id="ov"></div>
     <div class="hud hud-top">
       <div class="floors" role="group" aria-label="층 보기"><button id="f1" data-floor="1">1층 연구</button><button id="f2" data-floor="2">2층 생활</button></div>
-      <div class="clockbox"><span class="clock" id="clock">--:--</span><button id="speed">실시간</button><button id="pause" aria-pressed="false">멈춤</button></div>
+      <div class="clockbox"><span class="clock live" id="livechip" title="실제 상태 연결">●</span><span class="clock" id="clock">--:--</span><button id="speed">실시간</button><button id="pause" aria-pressed="false">멈춤</button></div>
     </div>
     <div class="hud hud-bottom">
       <div class="people" id="people" role="group" aria-label="연구원 따라가기"></div>
@@ -136,7 +137,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
   <div class="ticker" id="ticker" aria-live="off"></div>
   <div class="actions">
     <span class="follow" id="follow">따라가는 중: 미나</span>
-    <button id="replay">실제 기록 재생 · T24-1</button>
+    <button id="replay">실시간 수신 시험 · T24-1</button>
     <button id="ot" aria-pressed="false">야근 장면 보기</button>
     <label class="evt"><span>이벤트 미리보기</span>
       <select id="evt"><option value="">선택…</option><option value="rain">비 오는 날 켜기/끄기</option><option value="bday">생일 파티 (솔, 15시로 이동)</option>
@@ -499,7 +500,7 @@ function sceneFor(a, b, room, r) {
 const logEl = document.getElementById('log');
 function log(text, kind = 'life') {
   const t = kst(worldMs), li = document.createElement('li');
-  const k = kind === 'real' ? '<span class="k real">실제·시험</span>' : kind === 'love' ? '<span class="k love">관계</span>' : '<span class="k">연출</span>';
+  const k = kind === 'real' ? `<span class="k real">${typeof LIVE !== 'undefined' && LIVE.mode === 'live' ? '실제' : '실제·시험'}</span>` : kind === 'love' ? '<span class="k love">관계</span>' : '<span class="k">연출</span>';
   li.innerHTML = `<time>${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}</time>${k}<span></span>`;
   li.lastChild.textContent = text;
   logEl.prepend(li); while (logEl.children.length > 80) logEl.lastChild.remove();
@@ -1009,44 +1010,111 @@ function doConfess(a, b) {
   log(`${a.name}, ${b.name}에게 할 말이 있는 듯…`, 'love');
 }
 
-// ---------------------------------------------------------------- 실제 기록 재생(시험 T24-1)
-// 원장 기록: 2026-11-10 14:19:46Z 접수 → 수집 2건(retrieved) → 초안(gpt-6.1-terra) → 검토(gpt-6-sol, revise 3건) → 수정 → 완료, 내부 $0.054158
-const REAL = [
-  { who: 'lead', at: '23:19', go: 'status-board', text: '지시 T24-1 접수 (시험)', pose: 'stand', secs: 7 },
-  { who: 'research', at: '23:19', go: 'shelf-b', text: '법령 조문 2건 수집 완료 · 개인정보 보호법 제34조, 정보통신망법 제48조의3', pose: 'read', secs: 9 },
-  { who: 'research', at: '23:20', hand: 'writer', text: '원문 전달', secs: 3 },
-  { who: 'writer', at: '23:20', go: 'desk-writer', text: '초안 작성 (gpt-6.1-terra, 1,240자)', pose: 'type', secs: 9 },
-  { who: 'writer', at: '23:20', hand: 'reviewer', text: '초안을 별도 세션 검토로', secs: 3 },
-  { who: 'reviewer', at: '23:20', go: 'meet-2', text: '독립 검토 (gpt-6-sol): 수정 필요 · 지적 3건', pose: 'read', secs: 9 },
-  { who: 'reviewer', at: '23:21', hand: 'writer', text: '검토 의견 전달', secs: 3 },
-  { who: 'writer', at: '23:21', go: 'desk-writer', text: '수정본 작성 · 지적 3건 반영', pose: 'type', secs: 8 },
-  { who: 'lead', at: '23:21', go: 'status-board', text: '완료 기록 · OpenAI 3회 · 내부 $0.054', pose: 'stand', secs: 7, cheer: true },
-];
+// ---------------------------------------------------------------- 실제 상태 수신(연구소 원장 → 공개 상태 → 캐릭터)
+// 공개 상태 형식 = 홈페이지 v1 PublicLabState(agents/projects/events/reports). kernel/public_state.py가 만든다.
+// 0단계: 샘플(원장의 시험 지시 T24-1 기록에서 변환한 파일)만 사용. 1단계에서 LIVE_SOURCE에 실시간 구독(예: Firebase)을 연결.
+const SAMPLE_STATE = /*__SAMPLE__*/null;
+const LIVE_SOURCE = null;   // { subscribe(onState) } 또는 { url, every } — 연결 전에는 비어 있음(일하는 척 금지)
+const LIVE = { rev: -1, seen: new Set(), queue: [], busy: false, observedAt: null, lastApply: 0, agents: {}, mode: 'sample' };
+const STATION = { researching: ['shelf-b', 'read'], writing: [null, 'type'], reviewing: ['meet-2', 'read'], reporting: ['status-board', 'stand'] };
+const ACTIVE = new Set(['researching', 'writing', 'reviewing', 'reporting', 'running', 'working', 'investigating', 'thinking', 'executing']);
+const ag = id => agents.find(a => a.id === id);
+function validState(s) { return s && typeof s.revision === 'number' && Array.isArray(s.agents) && Array.isArray(s.events) && typeof s.serverTime === 'string'; }
+// 상태 하나 받기: 처음 연결 때 받은 지난 사건은 일지에만(재생 안 함), 그 뒤 새 사건만 순서대로 재생
+function applyState(s, { history = false } = {}) {
+  if (!validState(s) || s.revision < LIVE.rev) return;
+  LIVE.rev = s.revision; LIVE.observedAt = s.sourceObservedAt; LIVE.lastApply = Date.now();
+  LIVE.agents = Object.fromEntries(s.agents.map(a => [a.id, a]));
+  for (const e of [...s.events].sort((x, y) => (x.at < y.at ? -1 : 1))) {
+    if (LIVE.seen.has(e.id)) continue; LIVE.seen.add(e.id);
+    if (history) continue;
+    LIVE.queue.push(e);
+  }
+  // 진행 중 과제가 있는 사람은 야근 판정에도 반영
+  for (const [id, a] of Object.entries(LIVE.agents)) { if (ACTIVE.has(a.state)) activeTask.add(id); else if (!otPreview) activeTask.delete(id); }
+  pump();
+}
+function bringIn(a) { // 실제 일이 생기면 자고 있거나 퇴근한 사람도 연구소로(야근·호출)
+  if (a.pose === 'sleep') { a.pose = 'stand'; a.release(); a.emote('ex'); }
+  if (a.away) { a.away = false; a.x = ENTRANCE.c * T + 8; a.y = ENTRANCE.r * T + 14; }
+  a.act = null; a.route = [];
+}
+function goStation(a, state) {
+  const [sid, pose] = STATION[state] || [null, 'stand'];
+  const sp = spots.find(s => s.id === (sid || 'desk-' + a.id));
+  return new Promise(res => { sp.busy = null; a.gotoSpot(sp, () => { a.pose = pose; res(); }); });
+}
+const wait = ms => new Promise(r => setTimeout(r, ms / Math.max(1, simRate() * 0.8)));
+async function playEvent(e) {
+  const a = ag(e.agentId); if (!a) return;
+  const at = e.at ? kst(Date.parse(e.at)) : null, when = at ? `${String(at.hh).padStart(2, '0')}:${String(at.mm).padStart(2, '0')}` : '';
+  const say_ = (who, text, secs = 6) => { who.speak(text, secs, true); log(`${who.name} · ${text}${when ? ' (기록 ' + when + ')' : ''}`, 'real'); };
+  if (e.type === 'patrol') { if (!a.busy && !a.away && a.pose !== 'sleep') { a.real = e; await goStation(a, 'reporting'); a.emote('spark'); say_(a, '매시 점검 · 새 지시 확인', 4); await wait(3500); a.real = null; } return; }
+  bringIn(a); a.real = e; if (follow && LIVE.mode === 'live') selected = a.id;
+  if (e.type === 'accept') { await goStation(a, 'reporting'); a.emote('idea'); say_(a, e.summary); await wait(5000); }
+  else if (e.type === 'step_start') { await goStation(a, e.state); say_(a, e.summary, 5); await wait(4000); }
+  else if (e.type === 'step_done') { if (!a.spot) await goStation(a, e.state); say_(a, e.summary); a.emote(e.summary.includes('수정 필요') ? 'q' : 'spark'); await wait(5000); }
+  else if (e.type === 'step_failed') { a.emote('sweat', 3); say_(a, e.summary); await wait(5000); }
+  else if (e.type === 'handoff') { const b = ag(e.toAgentId); if (b) { bringIn(b);
+      const tgt = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dc, dr]) => [Math.round((b.x - 8) / T) + dc, Math.round((b.y - 14) / T) + dr]).find(t => passable(...t));
+      if (tgt) await new Promise(res => { a.carry = true; a.go(tgt[0], tgt[1], () => { a.carry = false; a.face = b.x > a.x ? 'right' : 'left'; res(); }); });
+      emit('spark', b.x, b.y - 34, 2); a.act1('bow', 1); } say_(a, e.summary, 4); await wait(3500); }
+  else if (e.type === 'complete') { await goStation(a, 'reporting'); say_(a, e.summary);
+    agents.forEach(x => { if (!x.away && x.pose !== 'sleep') { x.hop = 1.5; x.emote('spark'); emit('spark', x.x, x.y - 34, 3); } });
+    const w = ag('writer'), r = ag('reviewer'); if (w && r && !w.away && !r.away) highFive(w, r); await wait(5000); }
+  else if (e.type === 'blocked') { a.emote('q', 3); say_(a, e.summary); await wait(5000); }
+  // 그 사람의 공개 상태가 아직 '진행 중'이면 자리에 남아 계속 일함(아래 keepWorking), 아니면 생활로 복귀
+  if (!ACTIVE.has(LIVE.agents[a.id]?.state)) { a.real = null; a.cool = 1; }
+}
+async function pump() {
+  if (LIVE.busy) return; LIVE.busy = true;
+  while (LIVE.queue.length) { const e = LIVE.queue.shift(); try { await playEvent(e); } catch (err) { /* 한 사건 실패가 다음 사건을 막지 않게 */ } }
+  LIVE.busy = false;
+}
+function keepWorking() { // 공개 상태가 '진행 중'인 사람: 사건이 없어도 자기 자리에서 계속 일하는 모습(실제)
+  if (LIVE.busy) return;
+  for (const [id, s] of Object.entries(LIVE.agents)) {
+    const a = ag(id); if (!a) continue;
+    if (ACTIVE.has(s.state) && !stale()) {
+      if (!a.real) { bringIn(a); a.real = { summary: s.summary }; goStation(a, s.state).then(() => a.speak(s.summary || '진행 중', 5, true)); }
+    } else if (a.real && !LIVE.queue.length) { a.real = null; }
+  }
+}
+function stale() { return LIVE.mode === 'live' && (Date.now() - LIVE.lastApply > 90 * 60e3); }
+function liveLabel() {
+  if (LIVE.mode === 'sample') return '실제 기록 · 샘플(T24-1)';
+  if (stale()) return '연결 확인 중';
+  const t = LIVE.observedAt ? kst(Date.parse(LIVE.observedAt)) : null;
+  return t ? `실시간 · 마지막 기록 ${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}` : '실시간 연결됨';
+}
+function startLive() { // 1단계: 실제 공개 상태 구독. 지금은 LIVE_SOURCE가 비어 있어 아무것도 하지 않음
+  if (!LIVE_SOURCE) { if (SAMPLE_STATE) applyState(SAMPLE_STATE, { history: true }); return; }
+  LIVE.mode = 'live';
+  if (LIVE_SOURCE.subscribe) { let first = true; LIVE_SOURCE.subscribe(s => { applyState(s, { history: first }); first = false; }); return; }
+  let first = true;
+  const poll = async () => { try { const r = await fetch(LIVE_SOURCE.url, { cache: 'no-store' }); if (r.ok) { applyState(await r.json(), { history: first }); first = false; } } catch (err) { /* 다음 주기에 다시 */ }
+    setTimeout(poll, (LIVE_SOURCE.every || 15) * 1000); };
+  poll();
+}
+// 샘플 재생: 원장 기록(T24-1)을 실제 시간 간격(최소 6초)으로 하나씩 '새로 도착한 것처럼' 넣어 실시간 수신을 시험
 let replaying = false;
 async function replay() {
-  if (replaying) return; replaying = true;
+  if (replaying || !SAMPLE_STATE) return; replaying = true;
   const btn = document.getElementById('replay'); btn.disabled = true;
-  log('실제 기록 재생 시작: 시험 지시 T24-1 (2026-11-10 23:19~23:21 KST 원장 기록)', 'real');
-  const ag = id => agents.find(a => a.id === id);
-  for (const a of agents) { if (a.pose === 'sleep') { a.pose = 'stand'; a.release(); } a.away = false; }
-  for (const step of REAL) {
-    const a = ag(step.who); a.real = step; a.act = null; a.route = []; if (a.away) { a.away = false; a.x = ENTRANCE.c * T + 8; a.y = ENTRANCE.r * T + 14; }
-    await new Promise(res => {
-      const doIt = () => {
-        a.speak(step.text, step.secs + 1, true);
-        log(`${a.name} · ${step.text} (기록 ${step.at})`, 'real');
-        if (step.cheer) { agents.forEach(x => { x.hop = 1.5; x.emote('spark'); emit('spark', x.x, x.y - 34, 3); }); highFive(ag('writer'), ag('reviewer')); }
-        setTimeout(res, step.secs * 1000 / Math.max(1, simRate() * 0.8));
-      };
-      if (step.go) { const sp = spots.find(s => s.id === step.go); sp.busy = null; a.gotoSpot(sp, () => { a.pose = step.pose || a.pose; doIt(); }); }
-      else if (step.hand) { const b = ag(step.hand); const tgt = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dc, dr]) => [Math.round((b.x - 8) / T) + dc, Math.round((b.y - 14) / T) + dr]).find(t => passable(...t));
-        if (!tgt) { doIt(); return; }
-        a.carry = true; a.go(tgt[0], tgt[1], () => { a.carry = false; a.face = b.x > a.x ? 'right' : 'left'; emit('spark', b.x, b.y - 34, 2); doIt(); }); }
-      else doIt();
-    });
-    a.real = null; a.cool = 1;
+  log('샘플 수신 시작: 원장 시험 지시 T24-1 기록을 실시간 도착처럼 재생합니다(실제 간격, 최소 6초).', 'real');
+  const evs = SAMPLE_STATE.events.filter(e => e.type !== 'patrol');
+  for (const e of evs) LIVE.seen.delete(e.id);
+  let prev = null;
+  for (let i = 0; i < evs.length; i++) {
+    const e = evs[i], gap = prev ? Math.max(6000, Date.parse(e.at) - Date.parse(prev.at)) : 0; prev = e;
+    await new Promise(r => setTimeout(r, gap / Math.max(1, simRate() * 0.8)));
+    const active = {}; // 그 시점에 진행 중인 사람(시작했고 아직 안 끝남)
+    for (const x of evs.slice(0, i + 1)) { if (x.type === 'step_start') active[x.agentId] = x; if (x.type === 'step_done' || x.type === 'step_failed') delete active[x.agentId]; }
+    applyState({ ...SAMPLE_STATE, revision: LIVE.rev + 1, events: evs.slice(0, i + 1),
+      agents: SAMPLE_STATE.agents.map(a => active[a.id] ? { ...a, state: active[a.id].state, summary: active[a.id].summary.replace(' 시작', ' 중') } : { ...a, state: 'idle' }) });
   }
-  log('실제 기록 재생 끝. 이후 장면은 다시 생활 연출입니다.', 'real');
+  await new Promise(r => { const t = setInterval(() => { if (!LIVE.busy && !LIVE.queue.length) { clearInterval(t); r(); } }, 500); });
+  log('샘플 수신 끝. 이후 장면은 다시 생활 연출입니다.', 'real');
   replaying = false; btn.disabled = false;
 }
 
@@ -1320,7 +1388,7 @@ function panel() {
   const a = agents.find(a => a.id === selected); if (!a) return;
   document.getElementById('follow').textContent = follow ? `따라가는 중: ${a.name}` : `둘러보는 중: ${FLOOR_NAME[viewFloor]}`;
   const sch = schedule(a);
-  const doing = a.away ? (sch === 'home' ? '퇴근함(집)' : '바깥 산책 중') : a.real ? `실제 기록(시험): ${a.real.text}` : a.pose === 'sleep' ? '자는 중' : a.route.length ? '이동 중'
+  const doing = a.away ? (sch === 'home' ? '퇴근함(집)' : '바깥 산책 중') : a.real ? `실제 기록: ${a.real.summary || a.real.text || '진행 중'}` : a.pose === 'sleep' ? '자는 중' : a.route.length ? '이동 중'
     : a.act && a.act.talk ? '대화 중' : sch === 'overtime' && a.spot && a.spot.tags.includes('desk') ? '야근 중' : a.spot ? DOING[a.spot.tags[0]] || '생활 중' : '쉬는 중';
   const [pxx, pyy] = agentPos(a);
   const room = a.away ? '바깥' : `${FLOOR_NAME[floorOf(pxx)]} · ${ROOMS[grid[Math.round((pyy - 14) / T)]?.[Math.round((pxx - 8) / T)]?.room] || '복도'}`;
@@ -1361,7 +1429,8 @@ document.getElementById('speed').onclick = e => { const i = (SPEEDS.indexOf(spee
   e.currentTarget.textContent = speed === 1 ? '실시간' : speed + '배'; e.currentTarget.setAttribute('aria-pressed', String(speed > 1)); };
 document.getElementById('pause').onclick = e => { paused = !paused; e.currentTarget.setAttribute('aria-pressed', String(paused)); e.currentTarget.textContent = paused ? '계속' : '멈춤'; };
 document.getElementById('replay').onclick = replay;
-document.getElementById('ot').onclick = e => { const on = !activeTask.size; activeTask.clear(); if (on) { activeTask.add('writer'); activeTask.add('research'); }
+let otPreview = false;
+document.getElementById('ot').onclick = e => { const on = !otPreview; otPreview = on; activeTask.clear(); if (on) { activeTask.add('writer'); activeTask.add('research'); }
   e.currentTarget.setAttribute('aria-pressed', String(on)); log(on ? '시험 시뮬레이션: 솔·미나에게 진행 중 과제가 있다고 가정(야근 장면). 실제 과제 아님.' : '야근 시뮬레이션 끔.', 'real'); };
 function jumpTo(dow, hour) { // 미리보기용: 가까운 그 요일·시각으로 시계 이동(연출만, 기록과 무관)
   const now = new Date(worldMs + 9 * 3600e3); let add = (dow - now.getUTCDay() + 7) % 7;
@@ -1435,7 +1504,8 @@ function loop(now) {
   if ((panelT -= dt) <= 0) { panel(); panelT = 0.5; const t = kst(worldMs); const di = dayInfo(), hn = hourNow(), mode = di.weekend ? '주말' : hn >= 9 && hn < 18 ? '연구 시간' : hn >= 18 && hn < 23 ? '퇴근 후' : hn >= 23 || hn < 6 ? '한밤' : '출근 전';
     const hm = `${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}`; const wx = raining() ? '☔' : { spring: '🌸', summer: '☀', autumn: '🍂', winter: '❄' }[season()];
     clockEl.textContent = small() ? `${'일월화수목금토'[di.dow]} ${hm} ${wx}` : `${'일월화수목금토'[di.dow]} ${hm} · ${mode} · ${wx}`; clockEl.title = mode;
-    if (party.on && !(birthdayPerson() && hn >= 15 && hn < 15.5)) party.on = false; }
+    if (party.on && !(birthdayPerson() && hn >= 15 && hn < 15.5)) party.on = false;
+    const lc = document.getElementById('livechip'); lc.textContent = small() ? (stale() ? '● 확인 중' : '● 실제') : '● ' + liveLabel(); lc.style.color = stale() ? '#ffd166' : '#b9f0b2'; }
   requestAnimationFrame(loop);
 }
 Promise.all(Object.keys(ASSETS).map(load)).then(async () => {
@@ -1453,7 +1523,9 @@ Promise.all(Object.keys(ASSETS).map(load)).then(async () => {
   log('생활관 문이 열렸어요. 장면은 연출이고, 관계는 이 브라우저에 저장됩니다.');
   const couples = Object.entries(rel).filter(([, r]) => r.couple).map(([k]) => k.split('|').map(id => byId[id].name).join('·'));
   if (couples.length) log(`지난번에 이어서: ${couples.join(', ')} 커플 💕`, 'love');
+  startLive(); setInterval(keepWorking, 2000);
   panel(); requestAnimationFrame(loop);
+  window.__labApply = (st, opt) => { LIVE.mode = 'live'; applyState(st, opt); };   // 시험용: 실시간 수신 경로 확인
   window.__labState = () => agents.map(a => ({ id: a.id, pose: a.pose, spot: a.spot && a.spot.id, route: a.route.length, away: a.away, act: !!a.act, sch: schedule(a), pc: pcOn(a.id), floor: floorOf(agentPos(a)[0]) }));
 });
 })();

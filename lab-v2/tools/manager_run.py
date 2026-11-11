@@ -418,6 +418,17 @@ def cmd_schedule_record(L: RepoLedger, args) -> dict:
     return {"recorded": obs, "end_verified": cfg.get("end_verified")}
 
 
+def cmd_public_state(L: RepoLedger, args) -> dict:
+    """공개 상태(PublicLabState) 파일을 만든다. 게시는 하지 않는다(위치·공개 범위는 사용자 승인 후)."""
+    from kernel.public_state import build
+    body = build(L.root, _now(args))
+    out = args.out or os.path.join(L.root, "status", "public_state.preview.json")
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(body, f, ensure_ascii=False, indent=1)
+    return {"written": out, "revision": body["revision"], "events": len(body["events"]),
+            "active": [a["id"] for a in body["agents"] if a["state"] != "idle"]}
+
+
 def cmd_lock(L: RepoLedger, args) -> dict:
     """매 실행 첫 단계. 잠금을 못 잡으면 이번 실행은 아무것도 하지 않고 끝낸다(이중 실행 방지)."""
     ok, cur = L.try_lock(args.run, _now(args))
@@ -451,7 +462,8 @@ web1 저장소의 규칙 문서(lab-v2/prompts/common-rules.md, stages.md의 {st
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["plan-observe", "tick", "adopt", "summary", "prompt", "inbox", "run-openai", "lock", "unlock", "schedule-record"])
+    ap.add_argument("cmd", choices=["plan-observe", "tick", "adopt", "summary", "prompt", "inbox", "run-openai", "lock", "unlock", "schedule-record", "public-state"])
+    ap.add_argument("--out")
     ap.add_argument("--trigger-json")
     ap.add_argument("--rows")
     ap.add_argument("--max-jobs")
@@ -473,7 +485,7 @@ def main() -> None:
         out = {"plan-observe": cmd_plan_observe, "tick": cmd_tick, "adopt": cmd_adopt,
                "summary": cmd_summary, "inbox": cmd_inbox, "run-openai": cmd_run_openai,
                "lock": cmd_lock, "unlock": cmd_unlock,
-               "schedule-record": cmd_schedule_record}[a.cmd](L, a)
+               "schedule-record": cmd_schedule_record, "public-state": cmd_public_state}[a.cmd](L, a)
     print(json.dumps(out, ensure_ascii=False, indent=1))
 
 
