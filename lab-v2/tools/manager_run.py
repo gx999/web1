@@ -396,6 +396,11 @@ def cmd_run_openai(L: RepoLedger, args, http=None, fetch=None) -> dict:
         except Exception as exc:  # noqa: BLE001 — 한 작업의 실패가 다른 작업을 막지 않게
             j["state"], j["state_reason"] = "failed", f"program_error: {str(exc)[:200]}"
             save(j)
+        if j.get("state") == "done":                 # 완료 → 지피가 읽어 갈 비공개 보고서(reports/<지시ID>.md)
+            from kernel.report import write_report
+            write_report(L, j, _now(args))
+            if getattr(args, "publish_dir", None):
+                published.append(publish(L.root, args.publish_dir, _now(args), push=bool(getattr(args, "push", False))))
         ran.append({"job": jid, "state": j["state"], "reason": j.get("state_reason", "")})
     dv.refresh(store, L, _jobs(L.root), now)
     return {"ran": ran, "recovered": recovered, "budget": budget.report(),
@@ -441,6 +446,16 @@ def cmd_publish_state(L: RepoLedger, args) -> dict:
     return publish(L.root, args.dest, _now(args), push=bool(args.push))
 
 
+def cmd_report(L: RepoLedger, args) -> dict:
+    """완료된 작업 중 보고서가 없는 것의 보고서를 만든다(비공개 원장 reports/). 지피 보고용."""
+    from kernel.report import write_report
+    out = []
+    for j in _jobs(L.root).values():
+        if j.get("state") == "done" and (not args.task or j.get("directive_id") == args.task):
+            out.append(write_report(L, j, _now(args)))
+    return {"reports": [r for r in out if r]}
+
+
 def cmd_lock(L: RepoLedger, args) -> dict:
     """매 실행 첫 단계. 잠금을 못 잡으면 이번 실행은 아무것도 하지 않고 끝낸다(이중 실행 방지)."""
     ok, cur = L.try_lock(args.run, _now(args))
@@ -474,7 +489,7 @@ web1 저장소의 규칙 문서(lab-v2/prompts/common-rules.md, stages.md의 {st
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["plan-observe", "tick", "adopt", "summary", "prompt", "inbox", "run-openai", "lock", "unlock", "schedule-record", "public-state", "publish-state"])
+    ap.add_argument("cmd", choices=["plan-observe", "tick", "adopt", "summary", "prompt", "inbox", "run-openai", "lock", "unlock", "schedule-record", "public-state", "publish-state", "report"])
     ap.add_argument("--out")
     ap.add_argument("--dest")
     ap.add_argument("--publish-dir")
@@ -499,7 +514,7 @@ def main() -> None:
         out = {"plan-observe": cmd_plan_observe, "tick": cmd_tick, "adopt": cmd_adopt,
                "summary": cmd_summary, "inbox": cmd_inbox, "run-openai": cmd_run_openai,
                "lock": cmd_lock, "unlock": cmd_unlock,
-               "schedule-record": cmd_schedule_record, "public-state": cmd_public_state, "publish-state": cmd_publish_state}[a.cmd](L, a)
+               "schedule-record": cmd_schedule_record, "public-state": cmd_public_state, "publish-state": cmd_publish_state, "report": cmd_report}[a.cmd](L, a)
     print(json.dumps(out, ensure_ascii=False, indent=1))
 
 

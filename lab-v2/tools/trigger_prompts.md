@@ -88,3 +88,29 @@ lab-v2 코드 수정, 기존 v1 연구소·P1 기록 변경. 의심되면 아무
 ```
 
 - 2026-11-10 13:21Z: 고정 커밋 feff2a1(Notion 마크다운 정규화)로 사용자가 예약 지시문 수정. 화면에서 만든 예약은 관리 세션이 수정·끄기 불가(실행 세션 자신은 끄기만 가능).
+
+## E. 운영 매시 실행(초안 — 24시간 시험 종료·사용자 승인 후 기존 예약 지시문 교체)
+- 같은 예약(매시 :12) 유지, 저장소 web1·daeyong-lab·**daeyong-lab-status**, 커넥터 Notion만, 모델 Sonnet.
+- `<COMMIT>`은 승인 시점의 lab-v2 커밋으로 고정.
+```
+정대용 디지털 연구소 v2 매시 관리자 실행입니다. 연구 판단은 하지 않습니다.
+금지: Notion 쓰기, 예약 생성·변경, add_repo 등 권한 추가, 권한·결제 설정 변경, 코드 수정, 키·토큰 출력, 외부 연락,
+공개 게시(아래 publish-state·run-openai의 공개 상태 파일 푸시만 허용), 홈페이지 변경, v1 연구소·P1 기록 변경.
+막히면 우회하지 말고 기록만 하세요. OpenAI 호출은 아래 run-openai 명령으로만 합니다.
+
+0. ToolSearch로 "select:mcp__claude-code-remote__get_session" 를 불러와 get_session(인자 없음) → rate_limit_info 기록.
+   isUsingOverage=true 또는 status가 allowed가 아니면 사유 'waiting_limit'로 8만 하고 끝냅니다.
+1. RUN=run-$(date -u +%Y%m%dT%H%M%SZ). D=/home/user/daeyong-lab ; P=/home/user/daeyong-lab-status (둘 중 없으면 8로)
+   `git -C /home/user/web1 fetch -q origin claude/sharp-brown-8lieqe && git -C /home/user/web1 worktree add /tmp/w <COMMIT>`
+   cd /tmp/w/lab-v2 ; M="python tools/manager_run.py --repo $D"
+2. `$M lock --run $RUN` → acquired=false면 8로.
+3. `$M publish-state --dest $P --push`   (지피 점검 장면. 실패해도 계속)
+4. `$M plan-observe` → schedule_expired=true면 '게이트 기간 종료'를 기록하고 7로.
+5. Notion query-data-sources(rows 모드, data_source_url "collection://6ffdf2a6-8193-4c47-8e71-6a1d6eed55db", limit 100)
+   결과 JSON을 /tmp/rows.json에 저장 → `$M inbox --rows /tmp/rows.json`. 실패하면 기록하고 계속.
+6. `$M run-openai --run $RUN --max-jobs 1 --publish-dir $P --push`  (단계마다 공개 상태 갱신, 완료 시 비공개 보고서 생성)
+7. `$M report` → `$M summary --run $RUN` → `$M unlock --run $RUN` → `$M publish-state --dest $P --push`
+8. 결과 요약(잠금, 지시 처리, openai_calls, 비용, published, 오류)을 $D/ops/runs/$RUN.json 으로 저장하고
+   `cd $D && git add -A && (git commit -qm "run: $RUN" || true) && git push origin HEAD:main`
+   (거절 시 git pull --rebase 후 1회 재시도, 충돌이면 그대로 종료). 같은 요약을 최종 답변에도 쓰세요.
+```

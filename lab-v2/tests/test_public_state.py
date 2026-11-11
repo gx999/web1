@@ -30,7 +30,7 @@ def test_finished_chain_becomes_ordered_public_events(L, tmp_path):
     run_chain(L, tmp_path)
     body = build(L.root, 1800000200)
     kinds = [(e["agentId"], e["type"]) for e in body["events"]]
-    assert kinds[0] == ("lead", "accept") and kinds[-1] == ("lead", "complete")
+    assert kinds[0] == ("lead", "accept") and kinds[-1] == ("lead", "report_ready") and ("lead", "complete") in kinds
     assert ("research", "handoff") in kinds and ("reviewer", "step_done") in kinds
     assert all(a["state"] == "idle" for a in body["agents"])          # 끝난 작업은 진행 중으로 보이지 않음
     assert body["projects"][0]["title"] == "시험 과제"                   # 지시 내용은 나가지 않음
@@ -92,3 +92,33 @@ def test_run_openai_publishes_each_step(L, tmp_path):
     revs = [p["revision"] for p in out["published"]]
     assert len(revs) >= 3 and revs == sorted(revs)                 # 단계마다 갱신, 역행 없음
     assert json.load(open(dest / "status.json"))["projects"][0]["status"] == "done"
+
+
+def test_finished_chain_writes_private_report_and_public_event(L, tmp_path):
+    run_chain(L, tmp_path)
+    rp = os.path.join(L.root, "reports", "G-9.md")
+    assert os.path.exists(rp)
+    text = open(rp, encoding="utf-8").read()
+    assert "검토 전 초안" in text and "## 결과물" in text and "## 근거 자료" in text
+    idx = json.load(open(os.path.join(L.root, "status", "reports.json")))
+    assert idx["reports"][0]["directive_id"] == "G-9" and idx["reports"][0]["reported_by_gippy"] is None
+    body = build(L.root, 1800000200)
+    ev = [e for e in body["events"] if e["type"] == "report_ready"]
+    assert ev and ev[0]["summary"] == "지시 G-9 결과 보고서 준비"
+    pub = json.dumps(body, ensure_ascii=False)
+    assert "reports" in pub and "G-9.md" not in pub and "검토 전 초안" not in pub   # 보고서 경로·본문은 공개 안 됨
+    # 다시 실행해도 보고서·목록이 중복되지 않음
+    mr.cmd_report(L, NS(now="1800000300", task=None))
+    assert len(json.load(open(os.path.join(L.root, "status", "reports.json")))["reports"]) == 1
+
+
+def test_gippy_report_done_row_marks_report(L, tmp_path):
+    run_chain(L, tmp_path)
+    inbox(L, tmp_path, [row("r2", "G-9-보고", "report_done", "G-9", target="G-9")])
+    idx = json.load(open(os.path.join(L.root, "status", "reports.json")))
+    assert idx["reports"][0]["reported_by_gippy"]
+    kinds = [e["type"] for e in build(L.root, 1800000900)["events"]]
+    assert "reported" in kinds
+    inbox(L, tmp_path, [row("r3", "G-9-보고2", "report_done", "G-9", target="G-9")])     # 두 번째 표시는 거절
+    d = json.load(open(os.path.join(L.root, "status", "directives", "G-9-보고2.json")))
+    assert d["state"] == "rejected"

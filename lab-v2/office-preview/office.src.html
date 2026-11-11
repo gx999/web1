@@ -1125,6 +1125,8 @@ async function playEvent(e) {
     agents.forEach(x => { if (!x.away && x.pose !== 'sleep') { x.hop = 1.5; x.emote('spark'); emit('spark', x.x, x.y - 34, 3); } });
     const w = ag('writer'), r = ag('reviewer'); if (w && r && !w.away && !r.away) highFive(w, r); await wait(5000); }
   else if (e.type === 'blocked') { a.emote('q', 3); say_(a, e.summary); await wait(5000); }
+  else if (e.type === 'report_ready') { await goStation(a, 'reporting'); a.carry = true; a.emote('idea'); say_(a, e.summary); await wait(4500); a.carry = false; }
+  else if (e.type === 'reported') { a.emote('spark'); a.act1('bow', 1); say_(a, e.summary); await wait(4000); }
   // 그 사람의 공개 상태가 아직 '진행 중'이면 자리에 남아 계속 일함(아래 keepWorking), 아니면 생활로 복귀
   if (!ACTIVE.has(LIVE.agents[a.id]?.state)) { a.real = null; a.cool = 1; }
 }

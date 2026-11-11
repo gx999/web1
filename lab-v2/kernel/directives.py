@@ -148,6 +148,14 @@ def intake(rows: list[dict], store: DirectiveStore, ledger, approved_scopes: lis
             store.put(base, f"status/directives/_dup_{SAFE.sub('_', did)}_{rid[:8]}.json")
             out.append({"row": rid, "directive_id": did, "result": "rejected_duplicate_id"})
             continue
+        if base["kind"] == "report_done":   # 지피가 사용자에게 결과를 보고했다는 표시(지피는 GitHub 쓰기 권한이 없어 지시함으로 알림)
+            tgt = ((base["target"] or base["content"]).strip().split() or [""])[0]
+            ok = mark_reported(store, tgt, now)
+            store.set_state(base, "done" if ok else "rejected",
+                            f"지시 {tgt} 결과 보고 완료 표시" if ok else f"보고서 목록에 {tgt!r} 없음(또는 이미 표시됨)", now)
+            store.put(base)
+            out.append({"row": rid, "directive_id": did, "result": base["state"]})
+            continue
         if base["target"] == "openai_chain" and base["kind"] in ("new_goal", "new_task") and on_openai_job:
             # 승인 범위·금지 표현 검사는 일반 규칙과 같게 먼저 적용
             pre = process([InboxRow(rid, "new_goal", base["content"], "", 3)],
@@ -168,6 +176,25 @@ def intake(rows: list[dict], store: DirectiveStore, ledger, approved_scopes: lis
         store.put(base)
         out.append({"row": rid, "directive_id": did, "result": base["state"]})
     return out
+
+
+def mark_reported(store: "DirectiveStore", did: str, now: str) -> bool:
+    """status/reports.json 의 해당 보고서에 지피 보고 시각을 적는다. 이미 적혀 있거나 없으면 False."""
+    p = os.path.join(store.root, "status", "reports.json")
+    if not did or not os.path.exists(p):
+        return False
+    idx = json.load(open(p, encoding="utf-8"))
+    hit = next((r for r in idx.get("reports", []) if r.get("directive_id") == did and not r.get("reported_by_gippy")), None)
+    if not hit:
+        return False
+    hit["reported_by_gippy"] = now
+    store.write_json("status/reports.json", idx, f"reports: {did} reported by gippy")
+    d = store.get(did)
+    if d:
+        d["history"].append({"at": now, "state": "reported", "reason": "지피가 사용자에게 결과 보고"})
+        d["updated_at"] = now
+        store.put(d)
+    return True
 
 
 class _NullLedger:

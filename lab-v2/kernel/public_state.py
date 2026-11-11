@@ -102,6 +102,17 @@ def build(root: str, now: float, revision: int | None = None, include_tests: boo
         elif st in ("blocked", "blocked_budget", "failed"):
             events.append({"id": f"{jid}:{st}", "agentId": "lead", "type": "blocked", "state": "blocked",
                            "summary": f"지시 {did} 멈춤 · 사용자·지피 확인 필요", "at": j.get("updated_at")})
+    # 결과 보고서: 준비됨(지피가 사용자에게 전달할 차례) / 지피 보고 완료
+    rep = _read(os.path.join(root, "status", "reports.json"), {}) or {}
+    for r in rep.get("reports", []):
+        if not include_tests and r.get("test"):
+            continue
+        did = r.get("directive_id", "")
+        events.append({"id": f"report:{did}", "agentId": "lead", "type": "report_ready", "state": "reporting",
+                       "summary": f"지시 {did} 결과 보고서 준비", "at": r.get("ready_at")})
+        if r.get("reported_by_gippy"):
+            events.append({"id": f"reported:{did}", "agentId": "lead", "type": "reported", "state": "idle",
+                           "summary": f"지시 {did} 사용자에게 보고 완료", "at": r.get("reported_by_gippy")})
     # 관리자 매시 점검(잠금 기록) = 지피 순찰
     lock = _read(os.path.join(root, "ops", "manager_lock.json"), {}) or {}
     runs = sorted(glob.glob(os.path.join(root, "ops", "runs", "*.json")))[-6:]
@@ -112,7 +123,7 @@ def build(root: str, now: float, revision: int | None = None, include_tests: boo
             at = dt.datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S").strftime("%Y-%m-%dT%H:%M:%SZ")
             events.append({"id": f"patrol:{rid}", "agentId": "lead", "type": "patrol", "state": "idle", "summary": "매시 점검", "at": at})
     running_lock = bool(lock) and lock.get("released_at") is None and now < lock.get("expires_at", 0)
-    order = {"accept": 0, "step_done": 1, "step_failed": 1, "handoff": 2, "step_start": 3, "complete": 4, "blocked": 4, "patrol": 5}
+    order = {"accept": 0, "step_done": 1, "step_failed": 1, "handoff": 2, "step_start": 3, "complete": 4, "blocked": 4, "report_ready": 5, "reported": 6, "patrol": 7}
     events = sorted([e for e in events if e.get("at")], key=lambda e: (e["at"], order.get(e["type"], 9)))[-max_events:]
     observed = max([e["at"] for e in events], default=None)
     agents = []
