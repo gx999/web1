@@ -1014,9 +1014,10 @@ function doConfess(a, b) {
 // 공개 상태 형식 = 홈페이지 v1 PublicLabState(agents/projects/events/reports). kernel/public_state.py가 만든다.
 // 0단계: 샘플(원장의 시험 지시 T24-1 기록에서 변환한 파일)만 사용. 1단계에서 LIVE_SOURCE에 실시간 구독(예: Firebase)을 연결.
 const SAMPLE_STATE = /*__SAMPLE__*/null;
-// 1단계: 공개 저장소 gx999/daeyong-lab-status 의 status.json(허용 목록 값만). 주소에 ?live=off 를 붙이면 샘플만.
+// 1단계: 공개 저장소 gx999/daeyong-lab-status 의 status.json(허용 목록 값만)을 GitHub Pages로 읽음.
+// Pages는 방문자 요청 한도가 없고(API는 시간당 60회), 푸시 후 약 20~25초 안에 반영(실측). ?live=off 면 샘플만.
 const LIVE_SOURCE = /[?&]live=off\b/.test(location.search) ? null :
-  { url: 'https://api.github.com/repos/gx999/daeyong-lab-status/contents/status.json', accept: 'application/vnd.github.raw+json' };
+  { url: 'https://gx999.github.io/daeyong-lab-status/status.json' };
 const LIVE = { rev: -1, seen: new Set(), queue: [], busy: false, observedAt: null, serverTime: null, lastApply: 0, agents: {}, mode: 'sample', lab: null, poll: null };
 const STATION = { researching: ['shelf-b', 'read'], writing: [null, 'type'], reviewing: ['meet-2', 'read'], reporting: ['status-board', 'stand'] };
 const ACTIVE = new Set(['researching', 'writing', 'reviewing', 'reporting', 'running', 'working', 'investigating', 'thinking', 'executing']);
