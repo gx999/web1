@@ -110,3 +110,8 @@ v1 `lab-types.ts` 형식(agents/projects/events/reports)으로 내면 홈페이�
   - 사용자가 GitHub Pages 켬(main / root). 환경 `web1 연구소 v2` 허용 목록에 `gx999.github.io` 추가(사용자 승인).
   - Pages: 방문자 한도 없음, `access-control-allow-origin: *`, 조건부 요청 304·0바이트, 푸시 후 같은 주소 반영 21~24초(실측 2회).
   - 생활관 `LIVE_SOURCE`를 Pages 주소로 변경, 실제 연결 확인(실시간 · rev 1, 오류 0).
+- 2026-11-11 홈페이지 시험 페이지 준비(지피 확인 반영, 배포 없음):
+  - 운영 소스는 Google Drive `contact-release-2026-10-26`(git 없음), 배포는 지피가 맥의 Firebase CLI로 수동(`daeyong-jeong-website`). `X-Frame-Options: DENY`·CSP 없음 → 독립 페이지 `/lab/life/`(`public/lab/life/index.html`).
+  - `build.py --release` → `office-preview/release/lab/life/index.html`(244KB): doctype·charset·viewport, `noindex`, MIT 원문 주석, '← 연구소 대시보드로'(/lab/). 개인정보 정규식·이메일 0.
+  - 로컬 `/lab/life/` 경로 시험: 데스크톱·iPhone 13 모두 Pages 실시간 연결(rev 1), 오류 0.
+  - 지피 지적 'max-age=600'에 대해: 브라우저는 `cache: 'no-cache'`로 매번 재검증하고, Pages CDN은 배포 시 비워짐 → 같은 주소 반영 21~24초(실측 2회). 다른 방문자 망·CDN 지점에서 더 걸릴 수 있음(보장 아님).
