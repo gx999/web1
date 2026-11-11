@@ -115,3 +115,5 @@ v1 `lab-types.ts` 형식(agents/projects/events/reports)으로 내면 홈페이�
   - `build.py --release` → `office-preview/release/lab/life/index.html`(244KB): doctype·charset·viewport, `noindex`, MIT 원문 주석, '← 연구소 대시보드로'(/lab/). 개인정보 정규식·이메일 0.
   - 로컬 `/lab/life/` 경로 시험: 데스크톱·iPhone 13 모두 Pages 실시간 연결(rev 1), 오류 0.
   - 지피 지적 'max-age=600'에 대해: 브라우저는 `cache: 'no-cache'`로 매번 재검증하고, Pages CDN은 배포 시 비워짐 → 같은 주소 반영 21~24초(실측 2회). 다른 방문자 망·CDN 지점에서 더 걸릴 수 있음(보장 아님).
+- 2026-11-11 지피가 `/lab/life/` 배포(사용자 승인, 커밋 ce69735 원본 그대로). 배포본 = 원본 바이트 동일, 데스크톱·휴대폰 실시간 연결, `/lab/` 200 확인.
+  - 지피 지적 반영: 휴대폰 칩이 샘플·연결 실패 때도 '● 실제'로 보일 수 있던 문제 → `liveStatus()`(실제/샘플/확인 중), 연속 오류 3회도 '확인 중'. 시험: 정상→실제, 파일 없음→샘플, 2시간 무갱신→확인 중. 재배포는 별도 승인.

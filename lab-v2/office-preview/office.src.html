@@ -1086,7 +1086,14 @@ function keepWorking() { // 공개 상태가 '진행 중'인 사람: 사건이 �
 }
 // 공개 상태는 매시 점검 때마다 갱신된다. 마지막 갱신(serverTime)이 90분 넘으면 '연결 확인 중'(일하는 척 금지)
 function stale() { return LIVE.mode === 'live' && (Date.now() - (Date.parse(LIVE.serverTime) || LIVE.lastApply) > 90 * 60e3); }
+// 표시 상태: live(실제 연결·최근 갱신) / sample(연결 전·샘플) / check(갱신 끊김·연속 오류) — 연결이 안 되면 '실제'로 보이지 않게
+function liveStatus() {
+  if (LIVE.mode !== 'live') return 'sample';
+  if (stale() || (LIVE.poll && LIVE.poll.err >= 3)) return 'check';
+  return 'live';
+}
 function liveLabel() {
+  if (LIVE.mode === 'live' && LIVE.poll && LIVE.poll.err >= 3) return '연결 확인 중 · 상태 파일 응답 없음';
   if (LIVE.mode === 'sample') return LIVE_SOURCE && !LIVE.poll?.ok ? '실제 기록 샘플(T24-1) · 실시간 연결 전' : '실제 기록 · 샘플(T24-1)';
   if (stale()) return '연결 확인 중';
   const t = LIVE.observedAt ? kst(Date.parse(LIVE.observedAt)) : null;
@@ -1541,7 +1548,9 @@ function loop(now) {
     const hm = `${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}`; const wx = raining() ? '☔' : { spring: '🌸', summer: '☀', autumn: '🍂', winter: '❄' }[season()];
     clockEl.textContent = small() ? `${'일월화수목금토'[di.dow]} ${hm} ${wx}` : `${'일월화수목금토'[di.dow]} ${hm} · ${mode} · ${wx}`; clockEl.title = mode;
     if (party.on && !(birthdayPerson() && hn >= 15 && hn < 15.5)) party.on = false;
-    const lc = document.getElementById('livechip'); lc.textContent = small() ? (stale() ? '● 확인 중' : '● 실제') : '● ' + liveLabel(); lc.style.color = stale() ? '#ffd166' : '#b9f0b2'; }
+    const lc = document.getElementById('livechip'), st = liveStatus();
+    lc.textContent = small() ? '● ' + { live: '실제', sample: '샘플', check: '확인 중' }[st] : '● ' + liveLabel();
+    lc.style.color = { live: '#b9f0b2', sample: '#cfd8e3', check: '#ffd166' }[st]; }
   requestAnimationFrame(loop);
 }
 Promise.all(Object.keys(ASSETS).map(load)).then(async () => {
