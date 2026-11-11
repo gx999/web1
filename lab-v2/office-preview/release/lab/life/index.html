@@ -82,6 +82,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
 .name { position: absolute; transform: translate(-50%, 4px); font-family: var(--font-display); font-size: 15px; color: #fff; white-space: nowrap;
   text-shadow: 0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000 }
 .name.sel { color: #ffe08a }
+.name.pet { font-size: 12px; color: #fff3d6 } .name.pet.sel { color: #ffe08a }
+.bubble.pet { padding: 2px 8px; font-size: 14px; border-radius: 12px; border-color: #c98a5a; background: #fff6ea } .bubble.pet::after { border-top-color: #c98a5a }
 .ticker { min-height: 1.6em; font-size: 14.5px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
 .ticker b { font-family: var(--font-display); font-weight: 400; margin-right: 6px }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center }
@@ -142,13 +144,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
   <header class="top">
     <h1>디지털 연구소 생활관</h1>
     <button id="info" class="icon" aria-expanded="true" aria-controls="legend" aria-label="화면 설명 보기">ⓘ</button>
-    <p class="sub">지피·미나·솔·클로·코디가 사는 2층 연구소. 1층에서 연구하고, 2층에서 생활합니다.</p>
+    <p class="sub">지피·미나·솔·클로·코디와 고양이 까망이·귤이, 강아지 콩이가 사는 2층 연구소. 1층에서 연구하고, 2층에서 생활합니다.</p>
   </header>
   <div class="legend" id="legend">
     <span class="chip"><span class="dot" style="background:#e9c46a"></span>생활 장면은 연출입니다(가상의 성인 연구원 설정)</span>
     <span class="chip"><span class="dot" style="background:var(--leaf)"></span>초록 테두리 말풍선 = 실제 기록(현재는 시험 기록)</span>
     <span class="chip"><span class="dot" style="background:var(--accent)"></span>관계는 이 브라우저에서만 쌓입니다</span>
-    <span class="chip"><span class="dot" style="background:#8fb8d8"></span>화면을 끌면 둘러보고, 이름을 누르면 따라갑니다</span>
+    <span class="chip"><span class="dot" style="background:#8fb8d8"></span>화면을 끌면 둘러보고, 이름을 누르면 따라갑니다 · 동물을 누르면 야옹·멍멍</span>
   </div>
   <div class="stage" id="stage">
     <canvas id="cv" width="1248" height="816" aria-label="연구소 픽셀 화면. 캐릭터를 누르면 정보가 보이고 화면이 따라갑니다."></canvas>
@@ -696,12 +698,34 @@ let agents = [];
 const others = a => agents.filter(b => b !== a && !b.away);
 
 // ---------------------------------------------------------------- 고양이
+// 반려동물 설정(가상). 클릭하면 대사, 카드에 설정 표시. 생활 연출이며 실제 연구와 무관.
+const PET_INFO = {
+  '까망이': { kind: 'cat', species: '검은 고양이 · 2살', trait: '새침해 보이지만 은근 애교쟁이. 지피를 제일 잘 따라요.', likes: ['창가 햇볕', '종이 상자', '지피가 읽는 책 위'],
+    skill: '소리 없이 나타나 키보드 위에 눕기', home: '2층 생활관', color: '#6f6880',
+    click: ['야옹~', '냐앙?', '…(빤히)', '골골골 ♪', '냥!', '야옹~ 쓰다듬어도 돼.', '(꼬리 살랑살랑)', '미야~옹', '냥… 간식 시간 아니야?', '(꾹꾹이 꾹꾹)'],
+    sleep: ['Zzz… 냐…', '(꼬리 끝만 톡톡)', '…냥? (눈 반쯤 뜸)'], idle: ['야옹', '냐~', '(하품) 냐아…'] },
+  '귤이': { kind: 'cat', species: '치즈 고양이 · 3살', trait: '호기심 대장 장난꾸러기. 커피잔 엎기 전과 다수.', likes: ['레이저 포인터', '따뜻한 모니터 뒤', '코디가 몰래 주는 간식'],
+    skill: '일하는 사람 책상에 슬쩍 올라가기', home: '1층 연구실', color: '#f0a050',
+    click: ['야옹!', '냥냥!', '미야아~', '냐? 냐?', '골골송 ♪', '냥… 간식은?', '야~옹! 놀자!', '(빙글빙글 꼬리 쫓기)', '냐앙~ 여기 따뜻해.', '(박치기 콩)'],
+    sleep: ['Zzz… 냥냥…', '(식빵 굽는 중)', '…냐? 5분만 더.'], idle: ['냥!', '야옹~', '냐아~'] },
+  '콩이': { kind: 'dog', species: '크림색 강아지 · 1살', trait: '사람만 보면 꼬리가 프로펠러. 출근하는 사람 마중 담당.', likes: ['공놀이', '옥상 산책', '솔이 주는 고구마 간식'],
+    skill: '누가 와도 1등으로 달려가 반기기', home: '1층 라운지·입구', color: '#e3b778',
+    click: ['멍멍!', '왈! 왈!', '멍~ 놀아 줘요!', '헥헥… 산책 가요?', '낑낑~', '(꼬리 붕붕붕)', '멍! 공 던져 줘요!', '왕!', '멍멍, 좋아요 좋아!', '(배 보여 주기) 멍~'],
+    sleep: ['쿨… 쿨…', '(잠꼬대) 멍… 공…', '(귀만 쫑긋)'], idle: ['멍!', '왈!', '헥헥~'] },
+};
+const DOG_LINES = ['콩이야, 앉아! …오, 했다!', '공 던진다~ 가져와!', '꼬리 흔드는 거 봐, 그렇게 좋아?', '콩이 발바닥 고소한 냄새…', '오늘 산책은 내가 담당이야!', '손! …아니 그건 발이잖아 ㅎㅎ'];
 class Cat {
-  constructor(k, c, r, name) { this.k = k; this.name = name; this.x = c * T + 8; this.y = r * T + 14; this.route = []; this.state = 'sit'; this.t = rnd(2, 6); this.face = 'down'; this.anim = rnd(0, 3); this.follow = null; }
+  constructor(k, c, r, name) { this.k = k; this.name = name; this.x = c * T + 8; this.y = r * T + 14; this.route = []; this.state = 'sit'; this.t = rnd(2, 6); this.face = 'down'; this.anim = rnd(0, 3); this.follow = null;
+    this.info = PET_INFO[name] || { kind: 'cat', click: ['야옹~'], sleep: ['Zzz'], idle: ['야옹'], color: '#f0a050' }; this.kind = this.info.kind; this.color = this.info.color; this.bubble = null; this.hop = 0; this.speed = 26; this.id = 'pet:' + name; }
+  speak(text, secs = 3.2) { this.bubble = { text, t: secs }; }
+  get sleepy() { return this.state === 'loaf' && !this.route.length; }
   update(dt) {
     this.anim += dt;
+    if (this.bubble && (this.bubble.t -= dt) <= 0) this.bubble = null;
+    if (this.hop > 0) this.hop = Math.max(0, this.hop - dt * 2.2);
+    if (!this.bubble && Math.random() < dt * 0.006) this.speak(pick(this.sleepy ? this.info.sleep : this.info.idle), 2.4); // 가끔 혼잣말
     if (this.route.length) {
-      const [c, r] = this.route[0], tx = c * T + 8, ty = r * T + 14, sp = 26 * simRate();
+      const [c, r] = this.route[0], tx = c * T + 8, ty = r * T + 14, sp = this.speed * simRate();
       if (Math.abs(tx - this.x) > 3 * T) { this.x = tx; this.y = ty; this.route.shift(); return; }
       if (this.route.length === 1 && this.prank && Math.hypot(tx - this.x, ty - this.y) <= sp * dt) { const f = this.prank; this.prank = null; setTimeout(f, 50); }
       const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy);
@@ -712,6 +736,7 @@ class Cat {
     }
     if ((this.t -= dt) > 0) { if (this.state === 'loaf' && Math.random() < dt * 0.15) emit('z', this.x - 2, this.y - 16, 1, '#9fb7e0'); return; }
     let target;
+    if (!this.follow && this.kind === 'dog' && Math.random() < 0.45) this.follow = pick(agents.filter(a => !a.away && a.pose !== 'sleep' && floorOf(a.x) === floorOf(this.x))) || null; // 강아지는 사람 따라다니기
     if (this.follow && !this.follow.away && Math.random() < 0.7) target = [Math.round((this.follow.x - 8) / T) + (Math.random() < .5 ? 1 : -1), Math.round((this.follow.y - 14) / T)];
     else { const s = pick(spots.filter(s => ['sofa', 'bench', 'stroll', 'window', 'libseat', 'desk'].some(t => s.tags.includes(t)))); target = [s.c + pick([-1, 0, 1]), s.r + pick([0, 1])]; }
     const pth = target && passable(...target) ? path({ c: Math.round((this.x - 8) / T), r: Math.round((this.y - 14) / T) }, { c: target[0], r: target[1] }) : null;
@@ -720,17 +745,50 @@ class Cat {
   draw() {
     const im = imgs[this.k]; if (!im) return;
     if (this.state === 'walk' && (this.face === 'left' || this.face === 'right')) {
-      const f = Math.floor(this.anim * 8) % 3, x = Math.round(this.x - 16), y = Math.round(this.y - 26);
+      const f = Math.floor(this.anim * 8) % 3, x = Math.round(this.x - 16), y = Math.round(this.y - 26 - this.lift);
       cx.save(); if (this.face === 'left') { cx.translate((x + 32) * S, 0); cx.scale(-1, 1); cx.drawImage(im, f * 32, 64, 32, 32, 0, y * S, 32 * S, 32 * S); }
       else cx.drawImage(im, f * 32, 64, 32, 32, x * S, y * S, 32 * S, 32 * S); cx.restore(); return;
     }
     const row = this.face === 'up' ? 1 : 0;
     const col = this.state === 'walk' ? Math.floor(this.anim * 8) % 3 : this.state === 'loaf' ? 5 : 3 + (Math.floor(this.anim * 0.7) % 2);
-    const x = Math.round(this.x - 8), y = Math.round(this.y - 28);
+    const x = Math.round(this.x - 8), y = Math.round(this.y - 28 - this.lift);
     cx.drawImage(im, col * 16, row * 32, 16, 32, x * S, y * S, 16 * S, 32 * S);
+  }
+  get lift() { return this.hop > 0 ? Math.round(Math.sin(this.hop * Math.PI) * 4) : 0; }
+}
+// 강아지: 에셋이 없어 화면에서 직접 그린 픽셀(옆모습 14×11, 걷기·꼬리 흔들기·엎드리기)
+class Dog extends Cat {
+  constructor(c, r, name) { super(null, c, r, name); this.speed = 38; this.side = 'right'; }
+  draw() {
+    if (this.face === 'left' || this.face === 'right') this.side = this.face;
+    const L = this.side === 'left', bx = Math.round(this.x - 7), by = Math.round(this.y - 9 - this.lift);
+    const P = (dx, dy, w, h, c) => px(bx + (L ? 14 - dx - w : dx), by + dy, w, h, c);
+    const cream = '#f3dcb2', light = '#fbefd6', ear = '#c9935a', dark = '#3b3128', red = '#d9776b';
+    const walk = this.state === 'walk', lie = this.sleepy, step = Math.floor(this.anim * 10) % 2, wag = Math.floor(this.anim * (this.bubble || walk ? 14 : 5)) % 2;
+    px(bx + 2, by + 10, 11, 1, 'rgba(0,0,0,.18)');                                   // 그림자
+    if (lie) {                                                                        // 엎드려 자기
+      P(1, 7, 2, 1, cream); P(2, 6, 9, 4, cream); P(3, 9, 7, 1, light); P(8, 4, 5, 5, cream); P(12, 6, 2, 2, light); P(13, 6, 1, 1, dark);
+      P(8, 4, 2, 3, ear); P(10, 6, 2, 1, dark); P(8, 9, 3, 1, red); return;
+    }
+    P(0, wag ? 2 : 3, 2, 2, cream);                                                   // 꼬리(살랑)
+    P(2, 4, 9, 4, cream); P(3, 7, 7, 1, light);                                       // 몸
+    const l1 = walk && step ? 2 : 3, l2 = walk && !step ? 2 : 3;
+    P(3, 8, 2, l1, cream); P(8, 8, 2, l2, cream); P(3, 7 + l1, 2, 1, light); P(8, 7 + l2, 2, 1, light); // 다리
+    P(8, 0, 5, 5, cream); P(12, 2, 2, 2, light); P(13, 2, 1, 1, dark);                 // 머리·주둥이·코
+    P(8, 0, 2, 4, ear); P(11, 1, 1, 1, dark);                                         // 귀·눈
+    P(12, 4, 1, 1, '#f49ac1');                                                        // 혀(헥헥)
+    P(8, 5, 3, 1, red);                                                               // 목걸이
   }
 }
 let cats = [];
+function petLine(pet) { return pick(pet.sleepy ? pet.info.sleep : pet.info.click); }
+function petClick(pet) {
+  const woke = pet.sleepy && Math.random() < 0.5;
+  const line = woke ? pick(pet.info.sleep) : pick(pet.info.click);
+  pet.speak(line, 3.4); pet.hop = 1; if (woke) { pet.state = 'sit'; pet.t = rnd(4, 8); }
+  emit(pet.kind === 'dog' ? 'note' : 'heart', pet.x, pet.y - 20, 2, pet.kind === 'dog' ? undefined : '#f49ac1');
+  log(`${pet.name} · "${line}"`);
+}
 
 // ---------------------------------------------------------------- 행동 고르기(욕구 × 성격 × 시간대)
 function freeSpot(tag, a, near) {
@@ -889,7 +947,7 @@ function doGameNight(a) {
 }
 const game = { logged: false };
 function catPrank() {
-  const cat = cats.find(c => floorOf(c.x) === 1) || cats[0];
+  const cat = cats.find(c => c.kind === 'cat' && floorOf(c.x) === 1) || cats.find(c => c.kind === 'cat');
   const worker = agents.find(a => !a.away && a.spot && a.spot.tags.includes('desk') && floorOf(a.x) === 1); if (!worker) return false;
   const d = DESKS.find(d => d[0] === worker.id); const tgt = [d[1] + 3, d[2] + 1];
   if (!passable(...tgt)) return false;
@@ -908,7 +966,7 @@ function doCat(a) {
   const cat = pick(cats), c = Math.round((cat.x - 8) / T), r = Math.round((cat.y - 14) / T);
   const tgt = [[c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]].find(t => passable(...t));
   if (!tgt) return doWindow(a);
-  a.go(tgt[0], tgt[1], ok => { if (!ok) return; a.face = tgt[0] > c ? 'left' : tgt[0] < c ? 'right' : tgt[1] > r ? 'up' : 'down'; cat.t = Math.max(cat.t, 6); cat.state = 'sit'; a.speak(say(a, 'cat'), 3.5);
+  a.go(tgt[0], tgt[1], ok => { if (!ok) return; a.face = tgt[0] > c ? 'left' : tgt[0] < c ? 'right' : tgt[1] > r ? 'up' : 'down'; cat.t = Math.max(cat.t, 6); cat.state = 'sit'; a.speak(cat.kind === 'dog' ? pick(DOG_LINES) : say(a, 'cat'), 3.5); setTimeout(() => { cat.speak(petLine(cat), 3); cat.hop = 1; }, 1600);
     stay(a, 6, { tick: (x, dt) => Math.random() < dt * 1.2 && emit('heart', cat.x - 3, cat.y - 22, 1, '#f49ac1'), end: x => { x.need.fun += 22; cat.follow = Math.random() < .5 ? x : null; } }); log(`${a.name}, ${cat.name} 쓰다듬기.`); });
 }
 function doOutwalk(a) {
@@ -1083,7 +1141,7 @@ async function playEvent(e) {
   const at = e.at ? kst(Date.parse(e.at)) : null, when = at ? `${String(at.hh).padStart(2, '0')}:${String(at.mm).padStart(2, '0')}` : '';
   const say_ = (who, text, secs = 6) => { who.speak(text, secs, true); log(`${who.name} · ${text}${when ? ' (기록 ' + when + ')' : ''}`, 'real'); };
   if (e.type === 'patrol') { if (!a.busy && !a.away && a.pose !== 'sleep') { a.real = e; await goStation(a, 'reporting'); a.emote('spark'); say_(a, '매시 점검 · 새 지시 확인', 4); await wait(3500); a.real = null; } return; }
-  bringIn(a); a.real = e; if (follow && LIVE.mode === 'live') selected = a.id;
+  bringIn(a); a.real = e; if (follow && LIVE.mode === 'live') { selected = a.id; selectedPet = null; }
   if (e.type === 'accept') { await goStation(a, 'reporting'); a.emote('idea'); say_(a, e.summary); await wait(5000); }
   else if (e.type === 'step_start') { await goStation(a, e.state); say_(a, e.summary, 5); await wait(4000); }
   else if (e.type === 'step_done') { if (!a.spot) await goStation(a, e.state); say_(a, e.summary); a.emote(e.summary.includes('수정 필요') ? 'q' : 'spark'); await wait(5000); }
@@ -1164,6 +1222,7 @@ function startLive() {
   tick();
 }
 function resetLive() { const b = document.getElementById('replay'); if (b) b.hidden = true; LIVE.mode = 'live'; LIVE.rev = -1; LIVE.seen.clear(); LIVE.queue.length = 0; }
+window.__labPets = () => { const r = cv.getBoundingClientRect(), sc = r.width / (VW * T); return cats.map(c => ({ name: c.name, kind: c.kind, floor: floorOf(c.x), sx: r.left + (c.x - cam.x) * sc, sy: r.top + (c.y - 8 - cam.y) * sc, bubble: c.bubble && c.bubble.text, sel: selectedPet === c })); };
 window.__labPoll = () => LIVE.poll && { ...LIVE.poll, delay: pollDelay(LIVE.poll), mode: LIVE.mode, rev: LIVE.rev, label: liveLabel(), queue: LIVE.queue.length, real: agents.filter(a => a.real).map(a => a.id) };
 // 샘플 재생: 원장 기록(T24-1)을 실제 시간 간격(최소 6초)으로 하나씩 '새로 도착한 것처럼' 넣어 실시간 수신을 시험
 let replaying = false;
@@ -1413,7 +1472,7 @@ function render(dt) {
 
 // ---------------------------------------------------------------- 말풍선·이름표(HTML)
 const tags = new Map();
-let selected = 'research', viewFloor = 1;
+let selected = 'research', viewFloor = 1, selectedPet = null;
 const small = () => document.getElementById('stage').clientWidth < 640;
 const tickerEl = document.getElementById('ticker');
 let tickerLine = null;
@@ -1439,8 +1498,19 @@ function overlay() {
       t.bub.style.left = clamp(ox, full ? 60 : 14, W - (full ? 60 : 14)) + 'px'; t.bub.style.top = Math.max(full ? 46 : 20, oy - 34 * sc) + 'px';
     } else t.bub.hidden = true;
   }
+  for (const c of cats) {   // 반려동물: 작은 이름표(작은 화면에선 말할 때·선택했을 때만)와 말풍선
+    let t = tags.get(c.id);
+    if (!t) { t = { name: document.createElement('div'), bub: document.createElement('div') }; t.name.className = 'name pet'; t.bub.className = 'bubble pet'; ov.append(t.name, t.bub); tags.set(c.id, t); }
+    const ox = (c.x - cam.x) * sc, oy = (c.y - cam.y) * sc, inView = floorOf(c.x) === viewFloor && ox > -20 && ox < W + 20 && oy > 0 && oy < H + 40;
+    const showName = inView && (!sm || c.bubble || selectedPet === c);
+    t.name.hidden = !showName; t.name.textContent = c.name; t.name.classList.toggle('sel', selectedPet === c);
+    t.name.style.left = ox + 'px'; t.name.style.top = oy + 'px';
+    if (c.bubble && inView) { t.bub.hidden = false; if (t.bub.textContent !== c.bubble.text) t.bub.textContent = c.bubble.text;
+      t.bub.style.left = clamp(ox, 40, W - 40) + 'px'; t.bub.style.top = Math.max(30, oy - (c.kind === 'dog' ? 12 : 17) * sc - c.lift * sc) + 'px'; }
+    else t.bub.hidden = true;
+  }
   // 아래 한 줄 자막: 지금 보는 층에서 가장 최근 대사
-  const lines = agents.filter(a => a.bubble && !a.away && floorOf(agentPos(a)[0]) === viewFloor).sort((x, y) => (x.id === selected ? -1 : 0) - (y.id === selected ? -1 : 0) || y.bubble.t - x.bubble.t);
+  const lines = [...agents.filter(a => a.bubble && !a.away && floorOf(agentPos(a)[0]) === viewFloor), ...cats.filter(c => c.bubble && floorOf(c.x) === viewFloor)].sort((x, y) => (x.id === selected ? -1 : 0) - (y.id === selected ? -1 : 0) || y.bubble.t - x.bubble.t);
   const ln = lines[0]; const txt = ln ? ln.name + '|' + ln.bubble.text : '';
   if (txt !== tickerLine) { tickerLine = txt; tickerEl.textContent = '';
     if (ln) { const b = document.createElement('b'); b.textContent = ln.name; b.style.color = ln.color; tickerEl.append(b, document.createTextNode((ln.bubble.real ? '[실제 기록·시험] ' : '') + ln.bubble.text)); }
@@ -1453,10 +1523,17 @@ const DOING = { desk: '책상에서 일하는 중', shelf: '책 고르는 중', 
   plants: '화분 돌보기', window: '창밖 구경', stroll: '정원 산책', meet: '식탁·회의석에 앉아 있음', statusboard: '현황판 확인', leadvisit: '팀장실에 들름', game: '보드게임 중' };
 function panel() {
   if (!peopleEl.children.length) for (const p of PEOPLE) { const b = document.createElement('button'); b.id = 'pick-' + p.id; b.innerHTML = `<span class="dot" style="background:${p.color}"></span>`; b.append(p.name);
-    b.onclick = () => { selected = p.id; follow = true; panel(); }; peopleEl.append(b); }
-  for (const p of PEOPLE) document.getElementById('pick-' + p.id).setAttribute('aria-pressed', String(p.id === selected && follow));
+    b.onclick = () => { selectedPet = null; selected = p.id; follow = true; panel(); }; peopleEl.append(b); }
+  for (const p of PEOPLE) document.getElementById('pick-' + p.id).setAttribute('aria-pressed', String(!selectedPet && p.id === selected && follow));
   for (const f of [1, 2]) { const n = agents.filter(a => !a.away && floorOf(agentPos(a)[0]) === f).length; const b = document.getElementById('f' + f);
     b.textContent = small() ? `${f}층 ${n}` : `${f === 1 ? '1층 연구' : '2층 생활'} ${n}명`; b.setAttribute('aria-pressed', String(viewFloor === f)); }
+  if (selectedPet) { const c = selectedPet, i = c.info;
+    document.getElementById('follow').textContent = follow ? `보는 중: ${c.name}` : `둘러보는 중: ${FLOOR_NAME[viewFloor]}`;
+    const doing = c.route.length ? (c.follow ? `${c.follow.name} 따라가는 중` : '돌아다니는 중') : c.sleepy ? (c.kind === 'dog' ? '엎드려 쿨쿨' : '식빵 굽는 중(꾸벅)') : '앉아서 구경 중';
+    const card = document.getElementById('card'); card.innerHTML = '';
+    for (const [k, v] of [['이름', `${c.name} (${i.species})`], ['성격', i.trait], ['좋아하는 것', i.likes.join(' · ')], ['특기', i.skill], ['사는 곳', i.home], ['지금', doing], ['한마디', '눌러 보세요! ' + (c.kind === 'dog' ? '멍멍~' : '야옹~')]]) {
+      const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; card.append(dt, dd); }
+    document.getElementById('needs').innerHTML = ''; return; }
   const a = agents.find(a => a.id === selected); if (!a) return;
   document.getElementById('follow').textContent = follow ? `따라가는 중: ${a.name}` : `둘러보는 중: ${FLOOR_NAME[viewFloor]}`;
   const sch = schedule(a);
@@ -1494,7 +1571,9 @@ addEventListener('pointerup', () => { drag = null; });
 cv.addEventListener('click', e => { if (dragged) { dragged = false; return; }
   const rect = cv.getBoundingClientRect(), x = (e.clientX - rect.left) / rect.width * VW * T + cam.x, y = (e.clientY - rect.top) / rect.height * VH * T + cam.y;
   const hit = agents.filter(a => !a.away && floorOf(agentPos(a)[0]) === viewFloor).map(a => { const [ax, ay] = agentPos(a); return { a, d: Math.hypot(ax - x, ay - 14 - y) }; }).sort((p, q) => p.d - q.d)[0];
-  if (hit && hit.d < 22) { selected = hit.a.id; follow = true; panel(); if (!hit.a.bubble && !hit.a.real && hit.a.pose !== 'sleep') { hit.a.speak(say(hit.a, 'hello')); hit.a.hop = 0.8; } }
+  const ph = cats.filter(c => floorOf(c.x) === viewFloor).map(c => ({ c, d: Math.hypot(c.x - x, c.y - 8 - y) })).sort((p, q) => p.d - q.d)[0];
+  if (ph && ph.d < 13 && (!hit || ph.d <= hit.d)) { selectedPet = ph.c; follow = true; petClick(ph.c); panel(); return; }
+  if (hit && hit.d < 22) { selectedPet = null; selected = hit.a.id; follow = true; panel(); if (!hit.a.bubble && !hit.a.real && hit.a.pose !== 'sleep') { hit.a.speak(say(hit.a, 'hello')); hit.a.hop = 0.8; } }
 });
 const SPEEDS = [1, 30, 240];
 document.getElementById('speed').onclick = e => { const i = (SPEEDS.indexOf(speed) + 1) % SPEEDS.length; speed = SPEEDS[i]; if (speed === 1) worldMs = Date.now();
@@ -1534,7 +1613,8 @@ addEventListener('resize', () => fit());
 document.getElementById('zin').onclick = () => { zoomVW = clamp((zoomVW ?? VW) - 3, 7, FW); fit(); };
 document.getElementById('zout').onclick = () => { zoomVW = clamp((zoomVW ?? VW) + 3, 7, FW); fit(); };
 function camTarget() {
-  if (follow) { const a = agents.find(a => a.id === selected); if (a) {
+  if (follow && selectedPet) { viewFloor = floorOf(selectedPet.x); cam.tx = selectedPet.x - VW * T / 2; cam.ty = selectedPet.y - 10 - VH * T / 2; }
+  else if (follow) { const a = agents.find(a => a.id === selected); if (a) {
     if (a.away) { viewFloor = 1; cam.tx = ENTRANCE.c * T + 8 - VW * T / 2; cam.ty = ENTRANCE.r * T - VH * T / 2; }
     else { const [px, py] = agentPos(a); viewFloor = floorOf(px); cam.tx = px - VW * T / 2; cam.ty = py - 16 - VH * T / 2; } } }
   const fx0 = viewFloor === 2 ? F2X * T : 0;
@@ -1552,7 +1632,7 @@ function drawMini() {
   for (const a of agents) { if (a.away) continue; const [px, py] = agentPos(a);
     mx.fillStyle = a.color; mx.fillRect(px * k - 3, (py - 8) * k - 3, 6, 6);
     if (a.id === selected) { mx.strokeStyle = '#ffe08a'; mx.lineWidth = 2; mx.strokeRect(px * k - 5, (py - 8) * k - 5, 10, 10); } }
-  for (const c of cats) { mx.fillStyle = '#f0a050'; mx.fillRect(c.x * k - 1.5, (c.y - 6) * k - 1.5, 3, 3); }
+  for (const c of cats) { mx.fillStyle = c.color; mx.fillRect(c.x * k - 1.5, (c.y - 6) * k - 1.5, 3, 3); }
   mx.strokeStyle = 'rgba(255,255,255,.9)'; mx.lineWidth = 1.5; mx.strokeRect(cam.x * k, cam.y * k, VW * T * k, VH * T * k);
 }
 mini.addEventListener('click', e => { const r = mini.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * COLS * T, y = (e.clientY - r.top) / r.height * ROWS * T;
@@ -1591,6 +1671,7 @@ Promise.all(Object.keys(ASSETS).map(load)).then(async () => {
   for (const a of agents) if (schedule(a) === 'home') { a.away = true; a.x = ENTRANCE.c * T + 8; a.y = ENTRANCE.r * T + 14; }
   for (const a of agents) if (schedule(a) === 'sleep') { const sp = spots.find(s => s.id === 'bed-' + a.id); a.x = (sp.c + 1) * T + 8; a.y = (sp.r + 1) * T + 14; a.take(sp); a.pose = 'sleep'; }
   cats = [new Cat('pet_gitcat', F2X + 14, 9, '까망이'), new Cat('pet_claudio', 12, 12, '귤이')];
+  { const t = [[12, 14], [13, 14], [11, 14], [12, 13], [10, 13]].find(t => passable(...t)) || [12, 12]; cats.push(new Dog(t[0], t[1], '콩이')); }
   // 처음엔 깨어 있는 사람을 따라감
   const awake = agents.find(a => !a.away && a.pose !== 'sleep'); if (awake) selected = awake.id;
   camTarget(); cam.x = cam.tx; cam.y = cam.ty;
