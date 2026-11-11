@@ -1014,8 +1014,10 @@ function doConfess(a, b) {
 // 공개 상태 형식 = 홈페이지 v1 PublicLabState(agents/projects/events/reports). kernel/public_state.py가 만든다.
 // 0단계: 샘플(원장의 시험 지시 T24-1 기록에서 변환한 파일)만 사용. 1단계에서 LIVE_SOURCE에 실시간 구독(예: Firebase)을 연결.
 const SAMPLE_STATE = /*__SAMPLE__*/null;
-const LIVE_SOURCE = null;   // { subscribe(onState) } 또는 { url, every } — 연결 전에는 비어 있음(일하는 척 금지)
-const LIVE = { rev: -1, seen: new Set(), queue: [], busy: false, observedAt: null, lastApply: 0, agents: {}, mode: 'sample' };
+// 1단계: 공개 저장소 gx999/daeyong-lab-status 의 status.json(허용 목록 값만). 주소에 ?live=off 를 붙이면 샘플만.
+const LIVE_SOURCE = /[?&]live=off\b/.test(location.search) ? null :
+  { url: 'https://api.github.com/repos/gx999/daeyong-lab-status/contents/status.json', accept: 'application/vnd.github.raw+json' };
+const LIVE = { rev: -1, seen: new Set(), queue: [], busy: false, observedAt: null, serverTime: null, lastApply: 0, agents: {}, mode: 'sample', lab: null, poll: null };
 const STATION = { researching: ['shelf-b', 'read'], writing: [null, 'type'], reviewing: ['meet-2', 'read'], reporting: ['status-board', 'stand'] };
 const ACTIVE = new Set(['researching', 'writing', 'reviewing', 'reporting', 'running', 'working', 'investigating', 'thinking', 'executing']);
 const ag = id => agents.find(a => a.id === id);
@@ -1023,7 +1025,8 @@ function validState(s) { return s && typeof s.revision === 'number' && Array.isA
 // 상태 하나 받기: 처음 연결 때 받은 지난 사건은 일지에만(재생 안 함), 그 뒤 새 사건만 순서대로 재생
 function applyState(s, { history = false } = {}) {
   if (!validState(s) || s.revision < LIVE.rev) return;
-  LIVE.rev = s.revision; LIVE.observedAt = s.sourceObservedAt; LIVE.lastApply = Date.now();
+  if (s.revision === LIVE.rev) return;   // 같은 판(변경 없음)
+  LIVE.rev = s.revision; LIVE.observedAt = s.sourceObservedAt; LIVE.serverTime = s.serverTime; LIVE.lab = s.lab || null; LIVE.lastApply = Date.now();
   LIVE.agents = Object.fromEntries(s.agents.map(a => [a.id, a]));
   for (const e of [...s.events].sort((x, y) => (x.at < y.at ? -1 : 1))) {
     if (LIVE.seen.has(e.id)) continue; LIVE.seen.add(e.id);
@@ -1080,26 +1083,57 @@ function keepWorking() { // 공개 상태가 '진행 중'인 사람: 사건이 �
     } else if (a.real && !LIVE.queue.length) { a.real = null; }
   }
 }
-function stale() { return LIVE.mode === 'live' && (Date.now() - LIVE.lastApply > 90 * 60e3); }
+// 공개 상태는 매시 점검 때마다 갱신된다. 마지막 갱신(serverTime)이 90분 넘으면 '연결 확인 중'(일하는 척 금지)
+function stale() { return LIVE.mode === 'live' && (Date.now() - (Date.parse(LIVE.serverTime) || LIVE.lastApply) > 90 * 60e3); }
 function liveLabel() {
-  if (LIVE.mode === 'sample') return '실제 기록 · 샘플(T24-1)';
+  if (LIVE.mode === 'sample') return LIVE_SOURCE && !LIVE.poll?.ok ? '실제 기록 샘플(T24-1) · 실시간 연결 전' : '실제 기록 · 샘플(T24-1)';
   if (stale()) return '연결 확인 중';
   const t = LIVE.observedAt ? kst(Date.parse(LIVE.observedAt)) : null;
   return t ? `실시간 · 마지막 기록 ${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}` : '실시간 연결됨';
 }
-function startLive() { // 1단계: 실제 공개 상태 구독. 지금은 LIVE_SOURCE가 비어 있어 아무것도 하지 않음
-  if (!LIVE_SOURCE) { if (SAMPLE_STATE) applyState(SAMPLE_STATE, { history: true }); return; }
-  LIVE.mode = 'live';
-  if (LIVE_SOURCE.subscribe) { let first = true; LIVE_SOURCE.subscribe(s => { applyState(s, { history: first }); first = false; }); return; }
-  let first = true;
-  const poll = async () => { try { const r = await fetch(LIVE_SOURCE.url, { cache: 'no-store' }); if (r.ok) { applyState(await r.json(), { history: first }); first = false; } } catch (err) { /* 다음 주기에 다시 */ }
-    setTimeout(poll, (LIVE_SOURCE.every || 15) * 1000); };
-  poll();
+// 확인 간격: 실제로 일하는 동안만 빠르게. 화면을 안 보면 멈춤. 바뀐 게 없으면 GitHub가 '변경 없음'(본문 없음)으로 답함.
+const POLL = { fast: 5, near: 10, idle: 60, errors: [60, 120, 300] };
+function pollDelay(P) {
+  if (P.err) return POLL.errors[Math.min(P.err, POLL.errors.length) - 1];
+  if (P.remaining != null && P.remaining < 5) return Math.min(900, Math.max(60, (P.reset || 0) - Date.now() / 1000));
+  const busy = LIVE.lab?.status === 'running' || Object.values(LIVE.agents).some(a => ACTIVE.has(a.state)) || LIVE.queue.length;
+  const recent = LIVE.serverTime && Date.now() - Date.parse(LIVE.serverTime) < 10 * 60e3;
+  const m = kst(Date.now()).mm, near = m >= 8 && m <= 25;          // 매시 관리자 실행(:12 전후, 지연 포함)
+  let d = busy || recent ? POLL.fast : near ? POLL.near : POLL.idle;
+  if (P.remaining != null && P.remaining < 20) d = Math.max(d, 30);   // 한도가 줄면 느리게
+  return d;
 }
+function viewing() { return !document.hidden && stageVisible; }
+function startLive() {
+  if (SAMPLE_STATE) applyState(SAMPLE_STATE, { history: true });   // 연결 전·연결 실패 시에는 샘플(표시로 구분)
+  if (!LIVE_SOURCE) return;
+  if (LIVE_SOURCE.subscribe) { let first = true; LIVE_SOURCE.subscribe(s => { if (first) resetLive(); applyState(s, { history: first }); first = false; }); return; }
+  const P = LIVE.poll = { ok: false, err: 0, remaining: null, reset: null, timer: 0, waiting: false, count: 0 };
+  const tick = async () => {
+    P.timer = 0;
+    if (!viewing()) { P.waiting = true; return; }                  // 안 보는 동안 멈춤 → 다시 보면 즉시 재개
+    P.count++;
+    try {
+      const r = await fetch(LIVE_SOURCE.url, { cache: 'no-cache', headers: { Accept: LIVE_SOURCE.accept || 'application/json' } });
+      const rem = r.headers.get('x-ratelimit-remaining'); P.remaining = rem == null ? null : +rem; P.reset = +r.headers.get('x-ratelimit-reset') || null;
+      if (r.ok) { const s = await r.json(); const first = !P.ok; if (first) resetLive(); applyState(s, { history: first }); P.ok = true; P.err = 0; }
+      else P.err++;
+    } catch (err) { P.err++; }
+    P.timer = setTimeout(tick, pollDelay(P) * 1000);
+  };
+  const resume = () => { if (P.waiting && viewing()) { P.waiting = false; tick(); } };
+  document.addEventListener('visibilitychange', resume);
+  setInterval(resume, 1000);                                         // 화면 안으로 스크롤해 돌아온 경우
+  tick();
+}
+function resetLive() { const b = document.getElementById('replay'); if (b) b.hidden = true; LIVE.mode = 'live'; LIVE.rev = -1; LIVE.seen.clear(); LIVE.queue.length = 0; }
+window.__labPoll = () => LIVE.poll && { ...LIVE.poll, delay: pollDelay(LIVE.poll), mode: LIVE.mode, rev: LIVE.rev, label: liveLabel(), queue: LIVE.queue.length, real: agents.filter(a => a.real).map(a => a.id) };
 // 샘플 재생: 원장 기록(T24-1)을 실제 시간 간격(최소 6초)으로 하나씩 '새로 도착한 것처럼' 넣어 실시간 수신을 시험
 let replaying = false;
 async function replay() {
-  if (replaying || !SAMPLE_STATE) return; replaying = true;
+  if (replaying || !SAMPLE_STATE) return;
+  if (LIVE.mode === 'live') { log('실시간 연결 중에는 샘플 재생을 하지 않습니다(실제 기록과 섞지 않음).', 'real'); return; }
+  replaying = true;
   const btn = document.getElementById('replay'); btn.disabled = true;
   log('샘플 수신 시작: 원장 시험 지시 T24-1 기록을 실시간 도착처럼 재생합니다(실제 간격, 최소 6초).', 'real');
   const evs = SAMPLE_STATE.events.filter(e => e.type !== 'patrol');
@@ -1108,6 +1142,7 @@ async function replay() {
   for (let i = 0; i < evs.length; i++) {
     const e = evs[i], gap = prev ? Math.max(6000, Date.parse(e.at) - Date.parse(prev.at)) : 0; prev = e;
     await new Promise(r => setTimeout(r, gap / Math.max(1, simRate() * 0.8)));
+    if (LIVE.mode === 'live') break;
     const active = {}; // 그 시점에 진행 중인 사람(시작했고 아직 안 끝남)
     for (const x of evs.slice(0, i + 1)) { if (x.type === 'step_start') active[x.agentId] = x; if (x.type === 'step_done' || x.type === 'step_failed') delete active[x.agentId]; }
     applyState({ ...SAMPLE_STATE, revision: LIVE.rev + 1, events: evs.slice(0, i + 1),

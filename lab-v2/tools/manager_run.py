@@ -313,6 +313,8 @@ def cmd_run_openai(L: RepoLedger, args, http=None, fetch=None) -> dict:
     from collectors.law_go_kr import urllib_fetch
     from collectors.retry import RetryingFetch
     from kernel.agents_pipeline import run_chain
+    from kernel.status_publish import publish
+    published: list[dict] = []
     from kernel.budget import Budget
     from kernel.openai_agents import recover_pending, urllib_transport
     from tools.agents_pilot import PRICES, DRAFT_MODEL, REVIEW_MODEL
@@ -368,6 +370,9 @@ def cmd_run_openai(L: RepoLedger, args, http=None, fetch=None) -> dict:
 
         def save(job, jid=jid):
             L.write_json(f"ledger/jobs/{jid}.json", job, f"job: {jid} {job.get('state', '')}")
+            if getattr(args, "publish_dir", None):   # 단계가 바뀔 때마다 공개 상태 갱신(실패해도 연구는 계속)
+                published.append(publish(L.root, args.publish_dir, _now(args),
+                                         push=bool(getattr(args, "push", False))))
 
         def write_text(name, text, out_dir=out_dir):
             rel = out_dir + "/" + "/".join(_safe(x) for x in name.split("/"))
@@ -394,7 +399,8 @@ def cmd_run_openai(L: RepoLedger, args, http=None, fetch=None) -> dict:
         ran.append({"job": jid, "state": j["state"], "reason": j.get("state_reason", "")})
     dv.refresh(store, L, _jobs(L.root), now)
     return {"ran": ran, "recovered": recovered, "budget": budget.report(),
-            "openai_calls": len(budget.s["calls"]) - calls_before}
+            "openai_calls": len(budget.s["calls"]) - calls_before,
+            "published": [p for p in published if p.get("changed") or p.get("error")][-8:]}
 
 
 def cmd_schedule_record(L: RepoLedger, args) -> dict:
@@ -427,6 +433,12 @@ def cmd_public_state(L: RepoLedger, args) -> dict:
         json.dump(body, f, ensure_ascii=False, indent=1)
     return {"written": out, "revision": body["revision"], "events": len(body["events"]),
             "active": [a["id"] for a in body["agents"] if a["state"] != "idle"]}
+
+
+def cmd_publish_state(L: RepoLedger, args) -> dict:
+    """공개 상태를 --dest(공개 저장소 클론)의 status.json에 쓴다. --push가 있을 때만 커밋·푸시(사용자 승인 후 예약에서 사용)."""
+    from kernel.status_publish import publish
+    return publish(L.root, args.dest, _now(args), push=bool(args.push))
 
 
 def cmd_lock(L: RepoLedger, args) -> dict:
@@ -462,8 +474,10 @@ web1 저장소의 규칙 문서(lab-v2/prompts/common-rules.md, stages.md의 {st
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["plan-observe", "tick", "adopt", "summary", "prompt", "inbox", "run-openai", "lock", "unlock", "schedule-record", "public-state"])
+    ap.add_argument("cmd", choices=["plan-observe", "tick", "adopt", "summary", "prompt", "inbox", "run-openai", "lock", "unlock", "schedule-record", "public-state", "publish-state"])
     ap.add_argument("--out")
+    ap.add_argument("--dest")
+    ap.add_argument("--publish-dir")
     ap.add_argument("--trigger-json")
     ap.add_argument("--rows")
     ap.add_argument("--max-jobs")
@@ -485,7 +499,7 @@ def main() -> None:
         out = {"plan-observe": cmd_plan_observe, "tick": cmd_tick, "adopt": cmd_adopt,
                "summary": cmd_summary, "inbox": cmd_inbox, "run-openai": cmd_run_openai,
                "lock": cmd_lock, "unlock": cmd_unlock,
-               "schedule-record": cmd_schedule_record, "public-state": cmd_public_state}[a.cmd](L, a)
+               "schedule-record": cmd_schedule_record, "public-state": cmd_public_state, "publish-state": cmd_publish_state}[a.cmd](L, a)
     print(json.dumps(out, ensure_ascii=False, indent=1))
 
 

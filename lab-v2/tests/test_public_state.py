@@ -59,3 +59,36 @@ def test_safety_check_rejects(field, value):
             "lab": {}, "agents": [{"id": "a", "name": "미나", field: value}], "projects": [], "events": [], "reports": []}
     with pytest.raises(ValueError):
         assert_lab_state_safe(body)
+
+
+def test_publish_writes_only_on_change_and_revision_grows(L, tmp_path):
+    from kernel.status_publish import publish
+    dest = tmp_path / "status"; dest.mkdir()
+    run_chain(L, tmp_path)
+    a = publish(L.root, str(dest), 1800000200)
+    b = publish(L.root, str(dest), 1800000900)                        # 내용 같음 → 쓰지 않음
+    assert a["changed"] and a["revision"] == 1 and not b["changed"] and b["revision"] == 1
+    os.makedirs(os.path.join(L.root, "ops", "runs"), exist_ok=True)
+    open(os.path.join(L.root, "ops", "runs", "run-20261111T011200Z.json"), "w").write("{}")
+    c = publish(L.root, str(dest), 1800001000)                        # 매시 점검이 생김 → revision 2
+    assert c["changed"] and c["revision"] == 2
+    assert os.listdir(dest) == ["status.json"]
+    body = json.load(open(dest / "status.json"))
+    assert body["revision"] == 2 and any(e["type"] == "patrol" for e in body["events"])
+
+
+def test_publish_failure_never_raises(L, tmp_path):
+    from kernel.status_publish import publish
+    r = publish(L.root, str(tmp_path / "없는폴더"), 1800000200)
+    assert r["changed"] is False and "error" in r
+
+
+def test_run_openai_publishes_each_step(L, tmp_path):
+    dest = tmp_path / "status"; dest.mkdir()
+    gate(L)
+    inbox(L, tmp_path, [row("r1", "G-9", "new_task", CHAIN, target="openai_chain")])
+    out = mr.cmd_run_openai(L, NS(now="1800000100", max_jobs="1", run=None, publish_dir=str(dest), push=False),
+                            http=FakeOpenAI(), fetch=RetryingFetch(law_site(), sleep=lambda s: None))
+    revs = [p["revision"] for p in out["published"]]
+    assert len(revs) >= 3 and revs == sorted(revs)                 # 단계마다 갱신, 역행 없음
+    assert json.load(open(dest / "status.json"))["projects"][0]["status"] == "done"
