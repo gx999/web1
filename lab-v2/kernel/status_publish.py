@@ -26,8 +26,18 @@ def _git(dest: str, *a: str, run: Callable = subprocess.run) -> Any:
     return run(["git", "-C", dest, *a], capture_output=True, text=True, timeout=120)
 
 
+def _epoch(t) -> float | None:
+    try:
+        import datetime as dt
+        return dt.datetime.strptime(str(t), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc).timestamp()
+    except ValueError:
+        return None
+
+
 def publish(root: str, dest: str, now: float, push: bool = False, include_tests: bool = True,
-            run: Callable = subprocess.run) -> dict:
+            run: Callable = subprocess.run, min_interval: float = 0) -> dict:
+    """min_interval: 직전 게시(serverTime)로부터 이 초가 지나지 않았으면 이번 변경은 미룬다(다음 게시에 합쳐짐).
+    몇 초 간격의 연속 푸시가 GitHub Pages 배포를 취소·지연시키는 것을 막기 위함. 실행 마지막 게시는 0으로 호출해 반드시 반영."""
     out: dict = {"changed": False}
     try:
         if push:   # 이 저장소는 관리자 실행만 쓴다(관리자 잠금 안에서). 원격을 기준으로 맞춘 뒤 쓴다.
@@ -38,6 +48,10 @@ def publish(root: str, dest: str, now: float, push: bool = False, include_tests:
         body = build(root, now, revision=0, include_tests=include_tests)
         if prev and _core(prev) == _core(body):
             out["revision"] = prev.get("revision")
+            return out
+        last = _epoch((prev or {}).get("serverTime"))
+        if min_interval and last is not None and 0 <= now - last < min_interval:
+            out.update(deferred=True, revision=(prev or {}).get("revision"))
             return out
         body["revision"] = int((prev or {}).get("revision", 0)) + 1
         assert_lab_state_safe(body)

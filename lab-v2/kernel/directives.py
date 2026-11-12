@@ -158,7 +158,10 @@ def intake(rows: list[dict], store: DirectiveStore, ledger, approved_scopes: lis
             continue
         if base["target"] == "openai_chain" and base["kind"] in ("new_goal", "new_task") and on_openai_job:
             # 승인 범위·금지 표현 검사는 일반 규칙과 같게 먼저 적용
-            pre = process([InboxRow(rid, "new_goal", base["content"], "", 3)],
+            # 연구원 사슬은 도구 없이 글만 쓴다 → 행동 위험어(공개·결제·인증 등) 검사는 지시 첫 줄(무엇을 하라는지)에만 적용.
+            # 본문의 연구 대상 설명(예: '인증 의무화')이 오탐으로 보류되던 문제(G-20261112-AML-01) 해결.
+            head = (base["content"] or "").strip().splitlines()[0] if (base["content"] or "").strip() else ""
+            pre = process([InboxRow(rid, "new_goal", head, "", 3)],
                           _NullLedger(), set(), approved_scopes)[0]
             if pre.result != "accepted":
                 store.set_state(base, pre.result, pre.reason, now)

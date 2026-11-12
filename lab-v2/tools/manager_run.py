@@ -273,6 +273,9 @@ GATE_DEFAULTS = {   # 24시간 시험 제안값(사용자 확인 후 ops/openai_
     "window_start_epoch": None, "window_end_epoch": None}
 
 
+PUBLISH_MIN_INTERVAL = 25   # 단계 중 공개 상태 푸시 최소 간격(초). Pages 배포가 겹쳐 취소·지연되는 것 방지(실측 2026-11-12)
+
+
 class LockLost(Exception):
     """잠금 연장 실패 — 다른 관리자가 인수했을 수 있으므로 유료 호출을 하지 않고 중단."""
 
@@ -372,7 +375,7 @@ def cmd_run_openai(L: RepoLedger, args, http=None, fetch=None) -> dict:
             L.write_json(f"ledger/jobs/{jid}.json", job, f"job: {jid} {job.get('state', '')}")
             if getattr(args, "publish_dir", None):   # 단계가 바뀔 때마다 공개 상태 갱신(실패해도 연구는 계속)
                 published.append(publish(L.root, args.publish_dir, _now(args),
-                                         push=bool(getattr(args, "push", False))))
+                                         push=bool(getattr(args, "push", False)), min_interval=PUBLISH_MIN_INTERVAL))
 
         def write_text(name, text, out_dir=out_dir):
             rel = out_dir + "/" + "/".join(_safe(x) for x in name.split("/"))

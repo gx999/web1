@@ -83,7 +83,8 @@ def test_publish_failure_never_raises(L, tmp_path):
     assert r["changed"] is False and "error" in r
 
 
-def test_run_openai_publishes_each_step(L, tmp_path):
+def test_run_openai_publishes_each_step(L, tmp_path, monkeypatch):
+    monkeypatch.setattr(mr, "PUBLISH_MIN_INTERVAL", 0)   # 고정 시각 모의 실행이라 묶기 끔(묶기는 별도 시험)
     dest = tmp_path / "status"; dest.mkdir()
     gate(L)
     inbox(L, tmp_path, [row("r1", "G-9", "new_task", CHAIN, target="openai_chain")])
@@ -122,3 +123,28 @@ def test_gippy_report_done_row_marks_report(L, tmp_path):
     inbox(L, tmp_path, [row("r3", "G-9-보고2", "report_done", "G-9", target="G-9")])     # 두 번째 표시는 거절
     d = json.load(open(os.path.join(L.root, "status", "directives", "G-9-보고2.json")))
     assert d["state"] == "rejected"
+
+
+def test_publish_min_interval_coalesces_rapid_changes(L, tmp_path):
+    from kernel.status_publish import publish
+    dest = tmp_path / "status"; dest.mkdir()
+    run_chain(L, tmp_path)
+    a = publish(L.root, str(dest), 1800000200, min_interval=25)
+    os.makedirs(os.path.join(L.root, "ops", "runs"), exist_ok=True)
+    open(os.path.join(L.root, "ops", "runs", "run-20261111T011200Z.json"), "w").write("{}")
+    b = publish(L.root, str(dest), 1800000210, min_interval=25)      # 10초 뒤 변경 → 미룸
+    c = publish(L.root, str(dest), 1800000230, min_interval=25)      # 30초 뒤 → 반영(미룬 변경 포함)
+    d = publish(L.root, str(dest), 1800000231)                        # 마지막 게시(간격 없음)는 같은 내용이면 건너뜀
+    assert a["revision"] == 1 and b.get("deferred") and b["revision"] == 1
+    assert c["changed"] and c["revision"] == 2 and not d["changed"]
+
+
+def test_research_body_words_do_not_block_openai_chain(L, tmp_path):
+    gate(L)
+    body = CHAIN + "\n검증: 인증 의무화·공개 여부는 원문이 없으면 미확인으로 남긴다."
+    inbox(L, tmp_path, [row("r1", "G-10", "new_task", body, target="openai_chain")])
+    d = json.load(open(os.path.join(L.root, "status", "directives", "G-10.json")))
+    assert d["state"] == "accepted"
+    inbox(L, tmp_path, [row("r2", "G-11", "new_task", "결과를 홈페이지에 공개해 줘\n" + CHAIN.split("\n", 1)[1], target="openai_chain")])
+    d2 = json.load(open(os.path.join(L.root, "status", "directives", "G-11.json")))
+    assert d2["state"] == "needs_owner"                                 # 첫 줄의 행동 요청은 여전히 막힘
